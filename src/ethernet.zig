@@ -1,17 +1,4 @@
 const mem = @import("std").mem;
-//IEEE 802.3 Ethernet magic constants. The frame sizes omit the
-//preamble and FCS/CRC (frame check sequence)
-
-// #define ETH_ALEN    6       /* Octets in one ethernet addr   */
-// #define ETH_TLEN    2       /* Octets in ethernet type field */
-// #define ETH_HLEN    14      /* Total octets in header.   */
-// #define ETH_ZLEN    60      /* Min. octets in frame sans FCS */
-// #define ETH_DATA_LEN    1500        /* Max. octets in payload    */
-// #define ETH_FRAME_LEN   1514        /* Max. octets in frame sans FCS */
-// #define ETH_FCS_LEN 4       /* Octets in the FCS         */
-
-// #define ETH_MIN_MTU 68      /* Min IPv4 MTU per RFC791  */
-// #define ETH_MAX_MTU 0xFFFFU     /* 65535, same as IP_MAX_MTU    */
 
 pub const Protocol = enum(u16) {
     /// Ethernet Loopback packet
