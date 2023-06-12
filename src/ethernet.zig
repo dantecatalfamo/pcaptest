@@ -182,4 +182,12 @@ pub const Header = struct {
         @memcpy(&header.source, bytes[6..12]);
         return header;
     }
+
+    pub fn toBytes(self: Header) [14]u8 {
+        var out: [14]u8 = undefined;
+        @memcpy(out[0..6], &self.dest);
+        @memcpy(out[6..12], &self.source);
+        mem.writeIntBig(u16, out[12..14], @enumToInt(self.proto));
+        return out;
+    }
 };

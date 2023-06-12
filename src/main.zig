@@ -1,20 +1,11 @@
 const std = @import("std");
-const ether = @import("ether.zig");
+const ether = @import("ethernet.zig");
+const tcp = @import("tcp.zig");
 const c = @cImport({
     @cInclude("pcap/pcap.h");
 });
 
 pub fn main() !void {
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not dev debugging messages.
-    // const stdout_file = std.io.getStdOut().writer();
-    // var bw = std.io.bufferedWriter(stdout_file);
-    // const stdout = bw.writer();
-
-
-    // try bw.flush(); // don't forget to flush!
-
     var pcap_err_buf: [c.PCAP_ERRBUF_SIZE]u8 = undefined;
     const init_ret = c.pcap_init(c.PCAP_CHAR_ENC_UTF_8, &pcap_err_buf);
     std.debug.print("init_ret: {d}\n", .{ init_ret });
@@ -33,7 +24,7 @@ pub fn main() !void {
         return;
     }
 
-    const dev = c.pcap_create("any", &pcap_err_buf) orelse {
+    const dev = c.pcap_create(pcap_devs.?.name, &pcap_err_buf) orelse {
         std.debug.print("No dev device: {s}\n", .{ pcap_err_buf });
         return;
     };
@@ -72,7 +63,7 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     std.debug.print("Callback called\n", .{});
     std.debug.print("Header: {any}\n", .{ header.* });
     const data = bytes[0..header.*.caplen];
-    std.debug.print("{x}\n", .{ std.fmt.fmtSliceHexLower(data) });
+    std.debug.print("{x}\n", .{ std.fmt.fmtSliceHexLower(data[0..40]) });
     const eth = ether.Header.parse(data);
     std.debug.print("Ethernet: {any}\n", .{ eth });
     std.debug.print("  From: {x}:{x}:{x}:{x}:{x}:{x}\n", .{ eth.source[0], eth.source[1], eth.source[2], eth.source[3], eth.source[4], eth.source[5] });
