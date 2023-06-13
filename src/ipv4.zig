@@ -394,3 +394,82 @@ pub const Protocol = enum(u8) {
     reserved = 0xFF,
     _,
 };
+
+pub const Options = struct {
+    /// Set to 1 if the options need to be copied into all fragments
+    /// of a fragmented packet.
+    copied: bool,
+    class: Class,
+    type: Type,
+    length: u8,
+
+    pub const Class = enum (u2) {
+        control = 0,
+        reserved_1 = 1,
+        debugging = 2,
+        reserved_2 = 3,
+    };
+
+    pub const Type = enum(u5) {
+        /// End of Option List
+        eool = 0x00,
+        /// No Operation
+        nop = 0x01,
+        /// Security (defunct)
+        sec = 0x02,
+        /// Record Route
+        rr = 0x07,
+        /// Experimental Measurement
+        zsu = 0x0A,
+        /// MTU Probe
+        mtup = 0x0B,
+        /// MTU Reply
+        mtur = 0x0C,
+        /// ENCODE
+        encode = 0x0F,
+        /// Quick-Start
+        qs = 0x19,
+        /// RFC3692-style Experiment
+        exp = 0x1E,
+        /// Time Stamp
+        ts = 0x44,
+        /// Traceroute
+        tr = 0x52,
+        /// RFC3692-style Experiment
+        exp = 0x5E,
+        /// Security (RIPSO)
+        sec = 0x82,
+        /// Loose Source Route
+        lsr = 0x83,
+        /// -SEC 	Extended Security (RIPSO)
+        e = 0x85,
+        /// Commercial IP Security Option
+        cipso = 0x86,
+        /// Stream ID
+        sid = 0x88,
+        /// Strict Source Route
+        ssr = 0x89,
+        /// Experimental Access Control
+        visa = 0x8E,
+        /// IMI Traffic Descriptor
+        imitd = 0x90,
+        /// Extended Internet Protocol
+        eip = 0x91,
+        /// Address Extension
+        addext = 0x93,
+        /// Router Alert
+        rtralt = 0x94,
+        /// Selective Directed Broadcast
+        sdb = 0x95,
+        /// Dynamic Packet State
+        dps = 0x97,
+        /// Upstream Multicast Packet
+        ump = 0x98,
+        /// RFC3692-style Experiment
+        exp = 0x9E,
+        /// Experimental Flow Control
+        finn = 0xCD,
+        /// RFC3692-style Experiment
+        exp = 0xDE,
+    };
+};
