@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const log = std.log;
 const ether = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const tcp = @import("tcp.zig");
@@ -7,32 +8,33 @@ const c = @cImport({
     @cInclude("pcap/pcap.h");
 });
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var pcap_err_buf: [c.PCAP_ERRBUF_SIZE]u8 = undefined;
     const init_ret = c.pcap_init(c.PCAP_CHAR_ENC_UTF_8, &pcap_err_buf);
-    std.debug.print("init_ret: {d}\n", .{ init_ret });
+    log.debug("init_ret: {d}", .{ init_ret });
 
     var pcap_devs: ?*c.pcap_if_t = null;
     const dev_ret = c.pcap_findalldevs(&pcap_devs, &pcap_err_buf);
-    std.debug.print("dev_et: {d}\n", .{ dev_ret });
+    log.debug("dev_ret: {d}", .{ dev_ret });
     defer c.pcap_freealldevs(pcap_devs);
-
-    std.debug.print("{any}\n", .{ pcap_devs });
 
     if (pcap_devs) |dev| {
         debugDev(dev);
     } else {
-        std.debug.print("No devices\n", .{});
+        log.err("No devices", .{});
         return;
     }
 
+    log.info("Opening device: {s}", .{ pcap_devs.?.name });
     const dev = c.pcap_create(pcap_devs.?.name, &pcap_err_buf) orelse {
-        std.debug.print("No dev device: {s}\n", .{ pcap_err_buf });
+        log.err("No device: {s}", .{ pcap_err_buf });
         return;
     };
     defer c.pcap_close(dev);
-
-    std.debug.print("Any: {any}\n", .{ dev });
 
     var bpf: c.bpf_program = undefined;
     _ = bpf;
@@ -43,119 +45,73 @@ pub fn main() !void {
     // const promisc_ret = c.pcap_set_promisc(dev, 1);
     // std.debug.print("promisc_ret: {d}\n", .{ promisc_ret });
 
-    const timeout_ret = c.pcap_set_timeout(dev, 200);
-    std.debug.print("timeout_ret: {d}\n", .{ timeout_ret });
+    const timeout_ms = 200;
+    log.debug("Setting timeout at {d}ms", .{ timeout_ms });
+    const timeout_ret = c.pcap_set_timeout(dev, timeout_ms);
+    log.debug("timeout_ret: {d}", .{ timeout_ret });
 
     // const snaplen_ret = c.pcap_set_snaplen(dev, 65535);
     // std.debug.print("snapshot_ret: {d}\n", .{ snaplen_ret });
 
+    log.debug("Activating device", .{});
     const activate_ret = c.pcap_activate(dev);
-    std.debug.print("activate_ret: {d}\n", .{ activate_ret });
+    log.debug("activate_ret: {d}", .{ activate_ret });
     if (activate_ret < 0) {
-        std.debug.print("Error: {s}\n", .{ c.pcap_geterr(dev) });
+        log.err("Error activating: {s}", .{ c.pcap_geterr(dev) });
         return;
     }
 
+    log.debug("Starting pcap_loop", .{});
     const loop_ret = c.pcap_loop(dev, 0, callback, null);
-    std.debug.print("loop_ret: {d}\n", .{ loop_ret });
+    log.debug("loop_ret: {d}", .{ loop_ret });
 }
 
 pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c]const u8) void {
     _ = user;
-    std.debug.print("\nHeader:\n", .{});
-    std.debug.print("  Time: {d} {d}\n", .{ header.*.ts.tv_sec, header.*.ts.tv_usec });
-    std.debug.print("  Len:    {d}\n", .{ header.*.len });
-    std.debug.print("  Caplen: {d}\n", .{ header.*.caplen });
+    log.debug("Header:", .{});
+    log.debug("  Time: {d} {d}", .{ header.*.ts.tv_sec, header.*.ts.tv_usec });
+    log.debug("  Len:    {d}", .{ header.*.len });
+    log.debug("  Caplen: {d}", .{ header.*.caplen });
     const data = bytes[0..header.*.caplen];
     const eth = ether.Header.parse(data) catch {
         std.debug.panic("Ethernet packet too short\nBytes: {s}\n", .{ std.fmt.fmtSliceHexLower(data) });
     };
-    std.debug.print("Ethernet:\n", .{});
-    std.debug.print("  Source: {x}:{x}:{x}:{x}:{x}:{x}\n", .{
-        eth.source[0],
-        eth.source[1],
-        eth.source[2],
-        eth.source[3],
-        eth.source[4],
-        eth.source[5]
-    });
-    std.debug.print("  Dest:  {x}:{x}:{x}:{x}:{x}:{x}\n", .{
-        eth.dest[0],
-        eth.dest[1],
-        eth.dest[2],
-        eth.dest[3],
-        eth.dest[4],
-        eth.dest[5]
-    });
-    std.debug.print("  EtherType: {any}\n", .{ eth.ether_type });
     // Make sure we decoded and encode the ethernet header correctly
     std.debug.assert(mem.eql(u8, data[0..ether.header_size], &eth.toBytes()));
     if (eth.ether_type != .ip) {
+        log.info("{}", .{ eth });
         return;
     }
     const ip = ipv4.Header.parse(data[ether.header_size..]) catch unreachable;
-    std.debug.print("IPv4:\n", .{});
-    std.debug.print("  Version: {d}\n", .{ ip.version });
-    std.debug.print("  IHL: {d}\n", .{ ip.ihl });
-    std.debug.print("  DSCP: {d}\n", .{ ip.dscp });
-    std.debug.print("  ECN: {d}\n", .{ ip.ecn });
-    std.debug.print("  Len: {d}\n", .{ ip.len });
-    std.debug.print("  ID: {d}\n", .{ ip.id });
-    std.debug.print("  Flags:{s}{s}{s}\n", .{
-        if (ip.flags.mf) " MF" else "",
-        if (ip.flags.df) " DF" else "",
-        if (ip.flags.res) " RES" else ""
-    });
-    std.debug.print("  Frag Offset: {d}\n", .{ ip.frag_offset });
-    std.debug.print("  TTL: {d}\n", .{ ip.ttl });
-    std.debug.print("  Proto: {s}\n", .{ @tagName(ip.proto) });
-    std.debug.print("  Checksum: {x}\n", .{ ip.check });
-    std.debug.print("  Source: {d}.{d}.{d}.{d}\n", .{ ip.source[0], ip.source[1], ip.source[2], ip.source[3] });
-    std.debug.print("  Dest:   {d}.{d}.{d}.{d}\n", .{ ip.dest[0], ip.dest[1], ip.dest[2], ip.dest[3] });
     const ip_header = ip.toBytes() catch unreachable;
     // Make sure we decode and encode the IP header correctly (before TODO options)
     std.debug.assert(mem.eql(u8, data[ether.header_size..][0..ipv4.header_size_min], ip_header.slice()));
     if (ip.proto != .tcp) {
+        log.info("{} | {}", .{ eth, ip });
+
         return;
     }
     const tcp_hdr = tcp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
-    std.debug.print("TCP:\n", .{});
-    std.debug.print("  Source Port: {d}\n", .{ tcp_hdr.source_port });
-    std.debug.print("  Dest Port:   {d}\n", .{ tcp_hdr.dest_port });
-    std.debug.print("  Sequence: {d}\n", .{ tcp_hdr.seq });
-    std.debug.print("  Ack Number: {d}\n", .{ tcp_hdr.ack_number });
-    std.debug.print("  Data Offset: {d}\n", .{ tcp_hdr.data_offset });
-    std.debug.print("  Reserved: {d}\n", .{ tcp_hdr.reserved });
-    std.debug.print("  Flags:{s}{s}{s}{s}{s}{s}{s}{s}\n", .{
-        if (tcp_hdr.flags.cwr) " CWR" else "",
-        if (tcp_hdr.flags.ece) " ECE" else "",
-        if (tcp_hdr.flags.urg) " URG" else "",
-        if (tcp_hdr.flags.ack) " ACK" else "",
-        if (tcp_hdr.flags.psh) " PSH" else "",
-        if (tcp_hdr.flags.rst) " RST" else "",
-        if (tcp_hdr.flags.syn) " SYN" else "",
-        if (tcp_hdr.flags.fin) " FIN" else "",
-    });
-    std.debug.print("  Window Size: {d}\n", .{ tcp_hdr.win_size });
-    std.debug.print("  Checksum: {x}\n", .{ tcp_hdr.check });
-    std.debug.print("  Urgent Ptr: {d}\n", .{ tcp_hdr.urgent_ptr });
+    log.info("{} | {} | {}", .{ eth, ip, tcp_hdr });
 }
 
 pub fn debugDev(dev: *const c.pcap_if_t) void {
-    std.debug.print("Device: {s}\n", .{ dev.name });
-    std.debug.print("Flags: {d}\n", .{ dev.flags });
+    log.debug("Device: {s}", .{ dev.name });
+    log.debug("Flags: {d}", .{ dev.flags });
     if (dev.description) |desc| {
-        std.debug.print("Description: {s}\n", .{ desc });
+        log.debug("Description: {s}", .{ desc });
     }
     if (dev.next) |next| {
-        std.debug.print("-----\n", .{});
+        log.debug("-----", .{});
         debugDev(next);
     }
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+pub inline fn isNamed(enum_val: anytype) bool {
+    const E = @TypeOf(enum_val);
+    inline for (@typeInfo(E).Enum.fields) |field| {
+        if (@enumToInt(enum_val) == field.value)
+            return true;
+    }
+    return false;
 }

@@ -1,10 +1,19 @@
 const std = @import("std");
+const root = @import("root");
 const mem = std.mem;
 const debug = std.debug;
 const testing = std.testing;
 
 pub const header_size_min = 20;
 pub const header_size_max = 60;
+
+pub fn fmtAddress(bytes: []const u8) std.BoundedArray(u8, 15) {
+    var buf = std.BoundedArray(u8, 15).init(0) catch unreachable;
+    buf.writer().print("{d}.{d}.{d}.{d}", .{
+        bytes[0], bytes[1], bytes[2], bytes[3]
+    }) catch unreachable;
+    return buf;
+}
 
 pub const Header = struct {
     /// Version. For IPv4, this is always equal to 4
@@ -96,6 +105,34 @@ pub const Header = struct {
     pub inline fn byteSize(self: Header) usize {
         return @as(usize, self.ihl) * 4;
     }
+
+    pub fn format(
+        self: Header,
+        comptime fmtString: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype
+    ) !void {
+        _ = fmtString;
+        _ = options;
+        try writer.print("IPv4 src={s:<15} dst={s:<15} ver={d} ihl={d} dscp={d} ecn={d} len={d:<4} id={d:<5} flags=\"{s}{s}{s}\" frag_off={d:<4} ttl={d:<3} proto={s:<4} chk={x:<4}", .{
+            fmtAddress(&self.source).slice(),
+            fmtAddress(&self.dest).slice(),
+            self.version,
+            self.ihl,
+            self.dscp,
+            self.ecn,
+            self.len,
+            self.id,
+            if (self.flags.mf) "M" else ".",
+            if (self.flags.df) "D" else ".",
+            if (self.flags.res) "R" else ".",
+            self.frag_offset,
+            self.ttl,
+            @tagName(self.proto),
+            self.check,
+        });
+    }
+
 };
 
 pub const Flags = packed struct(u3) {

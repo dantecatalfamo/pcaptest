@@ -93,4 +93,33 @@ pub const Header = struct {
     pub inline fn byteSize(self: Header) usize {
         return @as(usize, self.data_offset) * 4;
     }
+
+    pub fn format(
+        self: Header,
+        comptime fmtString: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype
+    ) !void {
+        _ = fmtString;
+        _ = options;
+
+        try writer.print("TCP src={d:<5} dst={d:<5} seq={d:<10} ack={d:<10} doff={d:<2} res={d} flags=\"{s}{s}{s}{s}{s}{s}{s}{s}\" win={d:<5} urg={d}", .{
+            self.source_port,
+            self.dest_port,
+            self.seq,
+            self.ack_number,
+            self.data_offset,
+            self.reserved,
+            if (self.flags.cwr) "C" else ".",
+            if (self.flags.ece) "E" else ".",
+            if (self.flags.urg) "U" else ".",
+            if (self.flags.ack) "A" else ".",
+            if (self.flags.psh) "P" else ".",
+            if (self.flags.rst) "R" else ".",
+            if (self.flags.syn) "S" else ".",
+            if (self.flags.fin) "F" else ".",
+            self.win_size,
+            self.urgent_ptr,
+        });
+    }
 };

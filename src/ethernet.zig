@@ -1,6 +1,23 @@
-const mem = @import("std").mem;
+const std = @import("std");
+const root = @import("root");
+const fmt = std.fmt;
+const mem = std.mem;
 
 pub const header_size = 14;
+
+pub fn fmtAddress(bytes: []const u8) [17]u8 {
+    std.debug.assert(bytes.len >= 6);
+    var buf: [17]u8 = undefined;
+    _ = fmt.bufPrint(&buf, "{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}", .{
+        bytes[0],
+        bytes[1],
+        bytes[2],
+        bytes[3],
+        bytes[4],
+        bytes[5],
+    }) catch unreachable;
+    return buf;
+}
 
 pub const EtherType = enum(u16) {
     /// Ethernet Loopback packet
@@ -181,5 +198,25 @@ pub const Header = struct {
         @memcpy(out[6..12], &self.source);
         mem.writeIntBig(u16, out[12..14], @enumToInt(self.ether_type));
         return out;
+    }
+
+    pub fn format(
+        self: Header,
+        comptime fmtString: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype
+    ) !void {
+        _ = fmtString;
+        _ = options;
+
+        try writer.print("Ethernet src={s} dst={s} type={s}", .{
+            fmtAddress(&self.source),
+            fmtAddress(&self.dest),
+            if (root.isNamed(self.ether_type))
+                @tagName(self.ether_type)
+            else
+                "(unknown)",
+
+        });
     }
 };
