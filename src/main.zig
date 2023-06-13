@@ -1,5 +1,7 @@
 const std = @import("std");
+const mem = std.mem;
 const ether = @import("ethernet.zig");
+const ipv4 = @import("ipv4.zig");
 const tcp = @import("tcp.zig");
 const c = @cImport({
     @cInclude("pcap/pcap.h");
@@ -60,14 +62,59 @@ pub fn main() !void {
 
 pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c]const u8) void {
     _ = user;
-    std.debug.print("Callback called\n", .{});
-    std.debug.print("Header: {any}\n", .{ header.* });
+    std.debug.print("\nHeader:\n", .{});
+    std.debug.print("  Time: {d} {d}\n", .{ header.*.ts.tv_sec, header.*.ts.tv_usec });
+    std.debug.print("  Len:    {d}\n", .{ header.*.len });
+    std.debug.print("  Caplen: {d}\n", .{ header.*.caplen });
     const data = bytes[0..header.*.caplen];
-    std.debug.print("{x}\n", .{ std.fmt.fmtSliceHexLower(data[0..40]) });
-    const eth = ether.Header.parse(data);
-    std.debug.print("Ethernet: {any}\n", .{ eth });
-    std.debug.print("  From: {x}:{x}:{x}:{x}:{x}:{x}\n", .{ eth.source[0], eth.source[1], eth.source[2], eth.source[3], eth.source[4], eth.source[5] });
-    std.debug.print("  To:   {x}:{x}:{x}:{x}:{x}:{x}\n", .{ eth.dest[0], eth.dest[1], eth.dest[2], eth.dest[3], eth.dest[4], eth.dest[5] });
+    const eth = ether.Header.parse(data) catch {
+        std.debug.panic("Ethernet packet too short\nBytes: {s}\n", .{ std.fmt.fmtSliceHexLower(data) });
+    };
+    std.debug.print("Ethernet:\n", .{});
+    std.debug.print("  Source: {x}:{x}:{x}:{x}:{x}:{x}\n", .{
+        eth.source[0],
+        eth.source[1],
+        eth.source[2],
+        eth.source[3],
+        eth.source[4],
+        eth.source[5]
+    });
+    std.debug.print("  Dest:  {x}:{x}:{x}:{x}:{x}:{x}\n", .{
+        eth.dest[0],
+        eth.dest[1],
+        eth.dest[2],
+        eth.dest[3],
+        eth.dest[4],
+        eth.dest[5]
+    });
+    std.debug.print("  Proto: {any}\n", .{ eth.proto });
+    // Make sure we decoded and encode the ethernet header correctly
+    std.debug.assert(mem.eql(u8, data[0..14], &eth.toBytes()));
+    if (eth.proto != .ip) {
+        return;
+    }
+    const ip = ipv4.Header.parse(data[14..]) catch unreachable;
+    std.debug.print("IPv4:\n", .{});
+    std.debug.print("  Version: {d}\n", .{ ip.version });
+    std.debug.print("  IHL: {d}\n", .{ ip.ihl });
+    std.debug.print("  DSCP: {d}\n", .{ ip.dscp });
+    std.debug.print("  ECN: {d}\n", .{ ip.ecn });
+    std.debug.print("  Len: {d}\n", .{ ip.len });
+    std.debug.print("  ID: {d}\n", .{ ip.id });
+    std.debug.print("  Flags:{s}{s}{s}\n", .{
+        if (ip.flags.mf) " MF" else "",
+        if (ip.flags.df) " DF" else "",
+        if (ip.flags.res) " RES" else ""
+    });
+    std.debug.print("  Frag Offset: {d}\n", .{ ip.frag_offset });
+    std.debug.print("  TTL: {d}\n", .{ ip.ttl });
+    std.debug.print("  Proto: {s}\n", .{ @tagName(ip.proto) });
+    std.debug.print("  Checksum: {x}\n", .{ ip.check });
+    std.debug.print("  Source: {d}.{d}.{d}.{d}\n", .{ ip.source[0], ip.source[1], ip.source[2], ip.source[3] });
+    std.debug.print("  Dest:   {d}.{d}.{d}.{d}\n", .{ ip.dest[0], ip.dest[1], ip.dest[2], ip.dest[3] });
+    const ip_header = ip.toBytes() catch unreachable;
+    // Make sure we decode and encode the IP header correctly (before TODO options)
+    std.debug.assert(mem.eql(u8, data[14..14+20], ip_header.slice()));
 }
 
 pub fn debugDev(dev: *const c.pcap_if_t) void {

@@ -159,7 +159,10 @@ pub const Header = struct {
     /// Packet type
     proto: Protocol,
 
-    pub fn parse(bytes: []const u8) Header {
+    pub fn parse(bytes: []const u8) !Header {
+        if (bytes.len < 14) {
+            return error.InsufficientBytes;
+        }
         var header = Header{
             .dest = undefined,
             .source = undefined,
