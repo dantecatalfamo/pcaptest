@@ -115,6 +115,30 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     const ip_header = ip.toBytes() catch unreachable;
     // Make sure we decode and encode the IP header correctly (before TODO options)
     std.debug.assert(mem.eql(u8, data[14..14+20], ip_header.slice()));
+    if (ip.proto != .tcp) {
+        return;
+    }
+    const tcp_hdr = tcp.Header.parse(data[14+(@as(usize, ip.ihl)*4)..]) catch unreachable;
+    std.debug.print("TCP:\n", .{});
+    std.debug.print("  Source Port: {d}\n", .{ tcp_hdr.source_port });
+    std.debug.print("  Dest Port:   {d}\n", .{ tcp_hdr.dest_port });
+    std.debug.print("  Sequence: {d}\n", .{ tcp_hdr.seq });
+    std.debug.print("  Ack Number: {d}\n", .{ tcp_hdr.ack_number });
+    std.debug.print("  Data Offset: {d}\n", .{ tcp_hdr.data_offset });
+    std.debug.print("  Reserved: {d}\n", .{ tcp_hdr.reserved });
+    std.debug.print("  Flags:{s}{s}{s}{s}{s}{s}{s}{s}\n", .{
+        if (tcp_hdr.flags.cwr) " CWR" else "",
+        if (tcp_hdr.flags.ece) " ECE" else "",
+        if (tcp_hdr.flags.urg) " URG" else "",
+        if (tcp_hdr.flags.ack) " ACK" else "",
+        if (tcp_hdr.flags.psh) " PSH" else "",
+        if (tcp_hdr.flags.rst) " RST" else "",
+        if (tcp_hdr.flags.syn) " SYN" else "",
+        if (tcp_hdr.flags.fin) " FIN" else "",
+    });
+    std.debug.print("  Window Size: {d}\n", .{ tcp_hdr.win_size });
+    std.debug.print("  Checksum: {x}\n", .{ tcp_hdr.check });
+    std.debug.print("  Urgent Ptr: {d}\n", .{ tcp_hdr.urgent_ptr });
 }
 
 pub fn debugDev(dev: *const c.pcap_if_t) void {
