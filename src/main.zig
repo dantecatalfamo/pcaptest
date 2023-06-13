@@ -89,11 +89,11 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     });
     std.debug.print("  EtherType: {any}\n", .{ eth.ether_type });
     // Make sure we decoded and encode the ethernet header correctly
-    std.debug.assert(mem.eql(u8, data[0..14], &eth.toBytes()));
+    std.debug.assert(mem.eql(u8, data[0..ether.header_size], &eth.toBytes()));
     if (eth.ether_type != .ip) {
         return;
     }
-    const ip = ipv4.Header.parse(data[14..]) catch unreachable;
+    const ip = ipv4.Header.parse(data[ether.header_size..]) catch unreachable;
     std.debug.print("IPv4:\n", .{});
     std.debug.print("  Version: {d}\n", .{ ip.version });
     std.debug.print("  IHL: {d}\n", .{ ip.ihl });
@@ -114,11 +114,11 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     std.debug.print("  Dest:   {d}.{d}.{d}.{d}\n", .{ ip.dest[0], ip.dest[1], ip.dest[2], ip.dest[3] });
     const ip_header = ip.toBytes() catch unreachable;
     // Make sure we decode and encode the IP header correctly (before TODO options)
-    std.debug.assert(mem.eql(u8, data[14..14+20], ip_header.slice()));
+    std.debug.assert(mem.eql(u8, data[ether.header_size..][0..ipv4.header_size_min], ip_header.slice()));
     if (ip.proto != .tcp) {
         return;
     }
-    const tcp_hdr = tcp.Header.parse(data[14+(@as(usize, ip.ihl)*4)..]) catch unreachable;
+    const tcp_hdr = tcp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
     std.debug.print("TCP:\n", .{});
     std.debug.print("  Source Port: {d}\n", .{ tcp_hdr.source_port });
     std.debug.print("  Dest Port:   {d}\n", .{ tcp_hdr.dest_port });

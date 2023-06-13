@@ -1,5 +1,7 @@
 const mem = @import("std").mem;
 
+pub const header_size = 14;
+
 pub const EtherType = enum(u16) {
     /// Ethernet Loopback packet
     loop = 0x0060,

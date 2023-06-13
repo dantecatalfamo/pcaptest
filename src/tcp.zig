@@ -12,7 +12,8 @@ pub const Header = struct {
     seq: u32,
     /// Acknowledgment number
     ack_number: u32,
-    /// Data offset
+    /// Data offset. Size of the TCP header in 32-bit words.
+    /// Minimum 5.
     data_offset: u4,
     /// Reserved
     reserved: u4,
@@ -86,5 +87,10 @@ pub const Header = struct {
             .check = check,
             .urgent_ptr = urgent_ptr,
         };
+    }
+
+    /// Size of the header in bytes
+    pub inline fn byteSize(self: Header) usize {
+        return @as(usize, self.data_offset) * 4;
     }
 };

@@ -3,6 +3,9 @@ const mem = std.mem;
 const debug = std.debug;
 const testing = std.testing;
 
+pub const header_size_min = 20;
+pub const header_size_max = 60;
+
 pub const Header = struct {
     /// Version. For IPv4, this is always equal to 4
     version: u4,
@@ -87,6 +90,11 @@ pub const Header = struct {
         try writer.writer().writeAll(&self.dest);
         // TODO options
         return bounded;
+    }
+
+    /// Return the size of the IP header in bytes
+    pub inline fn byteSize(self: Header) usize {
+        return @as(usize, self.ihl) * 4;
     }
 };
 
