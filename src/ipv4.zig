@@ -6,7 +6,8 @@ const testing = std.testing;
 pub const Header = struct {
     /// Version. For IPv4, this is always equal to 4
     version: u4,
-    /// Internet Header length
+    /// Internet Header length. Number of 32-but words in the header.
+    /// Minimum 5.
     ihl: u4,
     /// Differentiated Services Code Point
     dscp: u6,

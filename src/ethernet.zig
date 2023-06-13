@@ -1,6 +1,6 @@
 const mem = @import("std").mem;
 
-pub const Protocol = enum(u16) {
+pub const EtherType = enum(u16) {
     /// Ethernet Loopback packet
     loop = 0x0060,
     /// Xerox PUP packet
@@ -157,7 +157,7 @@ pub const Header = struct {
     /// Source ethernet address
     source: [6]u8,
     /// Packet type
-    proto: Protocol,
+    ether_type: EtherType,
 
     pub fn parse(bytes: []const u8) !Header {
         if (bytes.len < 14) {
@@ -166,7 +166,7 @@ pub const Header = struct {
         var header = Header{
             .dest = undefined,
             .source = undefined,
-            .proto = @intToEnum(Protocol, mem.readIntBig(u16, bytes[12..14])),
+            .ether_type = @intToEnum(EtherType, mem.readIntBig(u16, bytes[12..14])),
         };
         @memcpy(&header.dest, bytes[0..6]);
         @memcpy(&header.source, bytes[6..12]);
@@ -177,7 +177,7 @@ pub const Header = struct {
         var out: [14]u8 = undefined;
         @memcpy(out[0..6], &self.dest);
         @memcpy(out[6..12], &self.source);
-        mem.writeIntBig(u16, out[12..14], @enumToInt(self.proto));
+        mem.writeIntBig(u16, out[12..14], @enumToInt(self.ether_type));
         return out;
     }
 };

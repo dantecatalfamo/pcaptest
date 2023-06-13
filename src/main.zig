@@ -87,10 +87,10 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
         eth.dest[4],
         eth.dest[5]
     });
-    std.debug.print("  Proto: {any}\n", .{ eth.proto });
+    std.debug.print("  EtherType: {any}\n", .{ eth.ether_type });
     // Make sure we decoded and encode the ethernet header correctly
     std.debug.assert(mem.eql(u8, data[0..14], &eth.toBytes()));
-    if (eth.proto != .ip) {
+    if (eth.ether_type != .ip) {
         return;
     }
     const ip = ipv4.Header.parse(data[14..]) catch unreachable;
