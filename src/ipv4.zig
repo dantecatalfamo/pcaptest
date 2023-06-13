@@ -396,6 +396,7 @@ pub const Protocol = enum(u8) {
 };
 
 pub const Options = struct {
+    // https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml#ip-parameters-1
     /// Set to 1 if the options need to be copied into all fragments
     /// of a fragmented packet.
     copied: bool,
