@@ -28,7 +28,10 @@ pub fn runGui(gui_state: *const root.GuiState) void {
         c.BeginDrawing();
         c.ClearBackground(c.RAYWHITE);
 
-        const packet_slice = gui_state.graph_packets.slice();
+        const packet_slice = if (c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT))
+            gui_state.graph_packets.slice()
+        else
+            gui_state.graph_bytes.slice();
 
         const screen_width = @intCast(u64, c.GetScreenWidth());
         const screen_height = @intCast(u64, c.GetScreenHeight());
@@ -72,6 +75,8 @@ pub fn runGui(gui_state: *const root.GuiState) void {
 
         c.DrawText(c.TextFormat("Device: %s", dev_name), 10, 10, 20, c.LIGHTGRAY);
         c.DrawText(c.TextFormat("Largest: %d", tallest_line), 10, 30, 20, c.LIGHTGRAY);
+        const showing_type = if (c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT)) "Packets".ptr else "Bytes".ptr;
+        c.DrawText(c.TextFormat("Showing: %s", showing_type), 10, 50, 20, c.LIGHTGRAY);
 
         c.EndDrawing();
     }

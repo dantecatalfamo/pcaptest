@@ -14,11 +14,12 @@ pub const std_options = struct {
     pub const log_level = .info;
 };
 
-const graph_buffer_len = 2048;
+const graph_buffer_len = 10_000;
 
 pub const GuiState = struct {
     device: ?*c.pcap_if_t = null,
     graph_packets: std.BoundedArray(GraphData, graph_buffer_len),
+    graph_bytes: std.BoundedArray(GraphData, graph_buffer_len),
 };
 
 pub const GraphData = struct {
@@ -34,6 +35,7 @@ pub const GraphData = struct {
 pub fn main() !void {
     var gui_state = GuiState{
         .graph_packets = try std.BoundedArray(GraphData, graph_buffer_len).init(0),
+        .graph_bytes = try std.BoundedArray(GraphData, graph_buffer_len).init(0),
     };
 
     log.info("Spawning GUI thread", .{} );
@@ -123,10 +125,14 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     if (gui_state.graph_packets.len == 0 or gui_state.graph_packets.slice()[gui_state.graph_packets.len-1].time != now) {
         if (gui_state.graph_packets.len == gui_state.graph_packets.capacity()) {
             _ = gui_state.graph_packets.orderedRemove(0);
+            _ = gui_state.graph_bytes.orderedRemove(0);
         }
         gui_state.graph_packets.append(GraphData{ .time = @intCast(u64, now) }) catch unreachable;
+        gui_state.graph_bytes.append(GraphData{ .time = @intCast(u64, now) }) catch unreachable;
     }
     var current_packet_graph = &gui_state.graph_packets.slice()[gui_state.graph_packets.len-1];
+    var current_byte_graph = &gui_state.graph_bytes.slice()[gui_state.graph_packets.len-1];
+
 
     switch (ip.proto) {
         .tcp => {
@@ -139,12 +145,14 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
             std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..tcp.header_size_min], tcp_bytes.slice()));
             log.info("{} | {} | {}", .{ eth, ip, tcp_hdr });
             current_packet_graph.tcp += 1;
+            current_byte_graph.tcp += ip.len;
         },
         .udp => {
             const udp_hdr = udp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
             log.info("{} | {} | {}", .{ eth, ip, udp_hdr });
             std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..udp.header_size], &udp_hdr.toBytes()));
             current_packet_graph.udp += 1;
+            current_byte_graph.udp += ip.len;
         },
         else => {
             log.info("{} | {}", .{ eth, ip });
