@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const math = std.math;
 const debug = std.debug;
 const testing = std.testing;
 const root = @import("root");
@@ -27,26 +28,50 @@ pub fn runGui(gui_state: *const root.GuiState) void {
         c.BeginDrawing();
         c.ClearBackground(c.RAYWHITE);
 
-        const slice = gui_state.graph_packets.slice();
-        for (slice, 0..) |item, idx| {
-            if (@intCast(isize, slice.len)-@intCast(isize, idx) > c.GetScreenWidth())
+        const packet_slice = gui_state.graph_packets.slice();
+
+        const screen_width = @intCast(u64, c.GetScreenWidth());
+        const screen_height = @intCast(u64, c.GetScreenHeight());
+        const x_over = @intCast(u64, @max(0, @intCast(i64, packet_slice.len) - @intCast(i64, screen_width)));
+
+        const tallest_line = blk: {
+            var largest: u64 = 0;
+            for (packet_slice[x_over..]) |item| {
+                if (item.total() > largest) {
+                    largest = item.total();
+                }
+            }
+            break :blk largest;
+        };
+        const scale = @intToFloat(f64, tallest_line) / @intToFloat(f64, screen_height);
+
+        for (packet_slice, 0..) |item, idx| {
+            if (@intCast(isize, packet_slice.len)-@intCast(isize, idx) > c.GetScreenWidth())
                 continue;
-            const screen_width = @intCast(u64, c.GetScreenWidth());
-            const screen_height = @intCast(u64, c.GetScreenHeight());
-            const x_over = @intCast(u64, @max(0, @intCast(i64, slice.len) - @intCast(i64, screen_width)));
-            // const x_over = @intCast(u64, @max(0, @min(0, @intCast(i64, screen_width) - @intCast(i64, slice.len))));
-            const tcp_x_pos = screen_width-@min(screen_width, slice.len)+(idx-x_over);
-            const tcp_y_pos = screen_height-@min(item.tcp, screen_height);
+            const tcp_scaled = @floatToInt(u64, @intToFloat(f64, item.tcp) / scale);
+            const udp_scaled = @floatToInt(u64, @intToFloat(f64, item.udp) / scale);
+
+            const x_pos = screen_width-@min(screen_width, packet_slice.len)+(idx-x_over);
+            const tcp_y_pos = screen_height-@min(tcp_scaled, screen_height);
+            const udp_y_pos = screen_height-@min(udp_scaled+tcp_scaled, screen_height);
             c.DrawRectangle(
-                @intCast(c_int, tcp_x_pos),
+                @intCast(c_int, x_pos),
                 @intCast(c_int, tcp_y_pos),
                 1,
-                @intCast(c_int, item.tcp),
-                c.GREEN
+                @intCast(c_int, tcp_scaled),
+                c.LIME
+            );
+            c.DrawRectangle(
+                @intCast(c_int, x_pos),
+                @intCast(c_int, udp_y_pos),
+                1,
+                @intCast(c_int, udp_scaled),
+                c.MAROON
             );
         }
 
         c.DrawText(c.TextFormat("Device: %s", dev_name), 10, 10, 20, c.LIGHTGRAY);
+        c.DrawText(c.TextFormat("Largest: %d", tallest_line), 10, 30, 20, c.LIGHTGRAY);
 
         c.EndDrawing();
     }

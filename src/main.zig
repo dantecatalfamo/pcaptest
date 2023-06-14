@@ -118,6 +118,8 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     std.debug.assert(mem.eql(u8, data[ether.header_size..][0..ipv4.header_size_min], ip_header.slice()));
 
     const now = std.time.timestamp();
+
+    // TODO Doesn't account for seconds where no packets are received
     if (gui_state.graph_packets.len == 0 or gui_state.graph_packets.slice()[gui_state.graph_packets.len-1].time != now) {
         if (gui_state.graph_packets.len == gui_state.graph_packets.capacity()) {
             _ = gui_state.graph_packets.orderedRemove(0);
