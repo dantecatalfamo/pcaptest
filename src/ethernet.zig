@@ -209,7 +209,7 @@ pub const Header = struct {
         _ = fmtString;
         _ = options;
 
-        try writer.print("Ethernet src={s} dst={s} type={s}", .{
+        try writer.print("\x1B[48;5;17mEthernet src={s} dst={s} type={s}\x1B[0m", .{
             fmtAddress(&self.source),
             fmtAddress(&self.dest),
             if (root.isNamed(self.ether_type))

@@ -117,7 +117,7 @@ pub const Header = struct {
     ) !void {
         _ = fmtString;
         _ = options;
-        try writer.print("IPv4 src={s:<15} dst={s:<15} ver={d} ihl={d} dscp={d} ecn={d} len={d:<4} id={d:<5} flags=\"{s}{s}{s}\" frag_off={d:<4} ttl={d:<3} proto={s:<4} chk={x:<4}", .{
+        try writer.print("\x1B[48;5;53mIPv4 src={s:<15} dst={s:<15} ver={d} ihl={d} dscp={d} ecn={d} len={d:<4} id={d:<5} flags=\"{s}{s}{s}\" frag_off={d:<4} ttl={d:<3} proto={s:<4} chk={x:<4}\x1B[0m", .{
             fmtAddress(&self.source).slice(),
             fmtAddress(&self.dest).slice(),
             self.version,

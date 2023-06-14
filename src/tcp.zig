@@ -134,7 +134,7 @@ pub const Header = struct {
         _ = fmtString;
         _ = options;
 
-        try writer.print("TCP src={d:<5} dst={d:<5} seq={d:<10} ack={d:<10} doff={d:<2} res={d} flags=\"{s}{s}{s}{s}{s}{s}{s}{s}\" win={d:<5} urg={d}", .{
+        try writer.print("\x1B[48;5;22mTCP src={d:<5} dst={d:<5} seq={d:<10} ack={d:<10} doff={d:<2} res={d} flags=\"{s}{s}{s}{s}{s}{s}{s}{s}\" win={d:<5} urg={d}\x1B[0m", .{
             self.source_port,
             self.dest_port,
             self.seq,

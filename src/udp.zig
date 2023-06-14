@@ -45,7 +45,7 @@ pub const Header = struct {
     ) !void {
         _ = fmtString;
         _ = options;
-        try writer.print("UDP src={d:<5} dst={d:<5} len={d:<5} chk={d:<5}", .{
+        try writer.print("\x1B[48;5;52mUDP src={d:<5} dst={d:<5} len={d:<5} chk={d:<5}\x1B[0m", .{
             self.source_port,
             self.dest_port,
             self.length,
