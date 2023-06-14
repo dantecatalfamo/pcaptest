@@ -26,6 +26,13 @@ pub fn build(b: *std.Build) void {
 
     exe.linkLibC();
     exe.linkSystemLibrary("pcap");
+    exe.linkSystemLibrary("raylib");
+    // exe.linkSystemLibrary("pthread");
+    exe.linkSystemLibrary("GL");
+    exe.linkSystemLibrary("rt");
+    exe.linkSystemLibrary("dl");
+    exe.linkSystemLibrary("m");
+    exe.linkSystemLibrary("X11");
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

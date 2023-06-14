@@ -5,6 +5,7 @@ const ether = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const tcp = @import("tcp.zig");
 const udp = @import("udp.zig");
+const gui = @import("gui.zig");
 const c = @cImport({
     @cInclude("pcap/pcap.h");
 });
@@ -13,7 +14,32 @@ pub const std_options = struct {
     pub const log_level = .info;
 };
 
+const graph_buffer_len = 2048;
+
+pub const GuiState = struct {
+    device: ?*c.pcap_if_t = null,
+    graph_packets: std.BoundedArray(GraphData, graph_buffer_len),
+};
+
+pub const GraphData = struct {
+    time: u64,
+    tcp: u64 = 0,
+    udp: u64 = 0,
+
+    pub inline fn total(self: GraphData) u64 {
+        return self.tcp + self.udp;
+    }
+};
+
 pub fn main() !void {
+    var gui_state = GuiState{
+        .graph_packets = try std.BoundedArray(GraphData, graph_buffer_len).init(0),
+    };
+
+    log.info("Spawning GUI thread", .{} );
+    const gui_thread = try std.Thread.spawn(.{}, gui.runGui, .{ &gui_state });
+    _ = gui_thread;
+
     var pcap_err_buf: [c.PCAP_ERRBUF_SIZE]u8 = undefined;
     const init_ret = c.pcap_init(c.PCAP_CHAR_ENC_UTF_8, &pcap_err_buf);
     log.debug("init_ret: {d}", .{ init_ret });
@@ -30,6 +56,7 @@ pub fn main() !void {
         return;
     }
 
+    gui_state.device = pcap_devs;
     log.info("Opening device: {s}", .{ pcap_devs.?.name });
     const dev = c.pcap_create(pcap_devs.?.name, &pcap_err_buf) orelse {
         log.err("No device: {s}", .{ pcap_err_buf });
@@ -63,12 +90,12 @@ pub fn main() !void {
     }
 
     log.debug("Starting pcap_loop", .{});
-    const loop_ret = c.pcap_loop(dev, 0, callback, null);
+    const loop_ret = c.pcap_loop(dev, 0, callback, @ptrCast(*u8, &gui_state));
     log.debug("loop_ret: {d}", .{ loop_ret });
 }
 
 pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c]const u8) void {
-    _ = user;
+    var gui_state = @ptrCast(*GuiState, @alignCast(@alignOf(GuiState), user));
     log.debug("Header:", .{});
     log.debug("  Time: {d} {d}", .{ header.*.ts.tv_sec, header.*.ts.tv_usec });
     log.debug("  Len:    {d}", .{ header.*.len });
@@ -90,6 +117,15 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     // Make sure we decode and encode the IP header correctly (before TODO options)
     std.debug.assert(mem.eql(u8, data[ether.header_size..][0..ipv4.header_size_min], ip_header.slice()));
 
+    const now = std.time.timestamp();
+    if (gui_state.graph_packets.len == 0 or gui_state.graph_packets.slice()[gui_state.graph_packets.len-1].time != now) {
+        if (gui_state.graph_packets.len == gui_state.graph_packets.capacity()) {
+            _ = gui_state.graph_packets.orderedRemove(0);
+        }
+        gui_state.graph_packets.append(GraphData{ .time = @intCast(u64, now) }) catch unreachable;
+    }
+    var current_packet_graph = &gui_state.graph_packets.slice()[gui_state.graph_packets.len-1];
+
     switch (ip.proto) {
         .tcp => {
             const tcp_hdr = tcp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
@@ -100,11 +136,13 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
             log.debug("OUT: {s}", .{ std.fmt.fmtSliceHexLower(tcp_bytes.slice()) });
             std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..tcp.header_size_min], tcp_bytes.slice()));
             log.info("{} | {} | {}", .{ eth, ip, tcp_hdr });
+            current_packet_graph.tcp += 1;
         },
         .udp => {
             const udp_hdr = udp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
             log.info("{} | {} | {}", .{ eth, ip, udp_hdr });
             std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..udp.header_size], &udp_hdr.toBytes()));
+            current_packet_graph.udp += 1;
         },
         else => {
             log.info("{} | {}", .{ eth, ip });
