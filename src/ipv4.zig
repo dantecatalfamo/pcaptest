@@ -80,9 +80,9 @@ pub const Header = struct {
         };
     }
 
-    pub fn toBytes(self: Header) !std.BoundedArray(u8, 60) {
+    pub fn toBytes(self: Header) !std.BoundedArray(u8, header_size_max) {
         // Room for header plus options
-        var bounded = try std.BoundedArray(u8, 60).init(0);
+        var bounded = try std.BoundedArray(u8, header_size_max).init(0);
         var writer = std.io.bitWriter(.Big, bounded.writer());
         try writer.writeBits(self.version, 4);
         try writer.writeBits(self.ihl, 4);
