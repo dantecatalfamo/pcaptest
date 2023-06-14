@@ -80,23 +80,26 @@ pub const Header = struct {
         };
     }
 
-    pub fn toBytes(self: Header) !std.BoundedArray(u8, header_size_max) {
+    pub fn toBytes(self: Header) std.BoundedArray(u8, header_size_max) {
         // Room for header plus options
-        var bounded = try std.BoundedArray(u8, header_size_max).init(0);
+        var bounded = std.BoundedArray(u8, header_size_max).init(0) catch unreachable;
         var writer = std.io.bitWriter(.Big, bounded.writer());
-        try writer.writeBits(self.version, 4);
-        try writer.writeBits(self.ihl, 4);
-        try writer.writeBits(self.dscp, 6);
-        try writer.writeBits(self.ecn, 2);
-        try writer.writer().writeIntBig(u16, self.len);
-        try writer.writer().writeIntBig(u16, self.id);
-        try writer.writeBits(@bitCast(u3, self.flags), 3);
-        try writer.writeBits(self.frag_offset, 13);
-        try writer.writer().writeByte(self.ttl);
-        try writer.writer().writeByte(@enumToInt(self.proto));
-        try writer.writer().writeIntBig(u16, self.check);
-        try writer.writer().writeAll(&self.source);
-        try writer.writer().writeAll(&self.dest);
+        // It shoudn't be possible to fail writing since we know the
+        // size, and it's all heap allocated. If this fails we made a
+        // mistake
+        writer.writeBits(self.version, 4) catch unreachable;
+        writer.writeBits(self.ihl, 4) catch unreachable;
+        writer.writeBits(self.dscp, 6) catch unreachable;
+        writer.writeBits(self.ecn, 2) catch unreachable;
+        writer.writer().writeIntBig(u16, self.len) catch unreachable;
+        writer.writer().writeIntBig(u16, self.id) catch unreachable;
+        writer.writeBits(@bitCast(u3, self.flags), 3) catch unreachable;
+        writer.writeBits(self.frag_offset, 13) catch unreachable;
+        writer.writer().writeByte(self.ttl) catch unreachable;
+        writer.writer().writeByte(@enumToInt(self.proto)) catch unreachable;
+        writer.writer().writeIntBig(u16, self.check) catch unreachable;
+        writer.writer().writeAll(&self.source) catch unreachable;
+        writer.writer().writeAll(&self.dest) catch unreachable;
         // TODO options
         return bounded;
     }

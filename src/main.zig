@@ -4,6 +4,7 @@ const log = std.log;
 const ether = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const tcp = @import("tcp.zig");
+const udp = @import("udp.zig");
 const c = @cImport({
     @cInclude("pcap/pcap.h");
 });
@@ -82,17 +83,33 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
         log.info("{}", .{ eth });
         return;
     }
+
+
     const ip = ipv4.Header.parse(data[ether.header_size..]) catch unreachable;
-    const ip_header = ip.toBytes() catch unreachable;
+    const ip_header = ip.toBytes();
     // Make sure we decode and encode the IP header correctly (before TODO options)
     std.debug.assert(mem.eql(u8, data[ether.header_size..][0..ipv4.header_size_min], ip_header.slice()));
-    if (ip.proto != .tcp) {
-        log.info("{} | {}", .{ eth, ip });
 
-        return;
+    switch (ip.proto) {
+        .tcp => {
+            const tcp_hdr = tcp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
+            const tcp_bytes = tcp_hdr.toBytes();
+            // Make sure we decode and encode TCP header correctly (before TODO options)
+            log.debug("Size: {d} ({d})", .{ tcp_hdr.byteSize(), tcp_hdr.data_offset });
+            log.debug("IN:  {s}", .{ std.fmt.fmtSliceHexLower(data[ether.header_size..][ip.byteSize()..][0..tcp_hdr.byteSize()]) });
+            log.debug("OUT: {s}", .{ std.fmt.fmtSliceHexLower(tcp_bytes.slice()) });
+            std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..tcp.header_size_min], tcp_bytes.slice()));
+            log.info("{} | {} | {}", .{ eth, ip, tcp_hdr });
+        },
+        .udp => {
+            const udp_hdr = udp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
+            log.info("{} | {} | {}", .{ eth, ip, udp_hdr });
+            std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..udp.header_size], &udp_hdr.toBytes()));
+        },
+        else => {
+            log.info("{} | {}", .{ eth, ip });
+        }
     }
-    const tcp_hdr = tcp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
-    log.info("{} | {} | {}", .{ eth, ip, tcp_hdr });
 }
 
 pub fn debugDev(dev: *const c.pcap_if_t) void {

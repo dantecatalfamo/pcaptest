@@ -3,6 +3,9 @@ const mem = std.mem;
 const debug = std.debug;
 const testing = std.testing;
 
+pub const header_size_min = 20;
+pub const header_size_max = 60;
+
 pub const Header = struct {
     /// Source port
     source_port: u16,
@@ -87,6 +90,34 @@ pub const Header = struct {
             .check = check,
             .urgent_ptr = urgent_ptr,
         };
+    }
+
+    pub fn toBytes(self: Header) std.BoundedArray(u8, header_size_max) {
+        // Room for header plus options
+        var bounded = std.BoundedArray(u8, header_size_max).init(0) catch unreachable;
+        var writer = std.io.bitWriter(.Big, bounded.writer());
+        // It shoudn't be possible to fail writing since we know the
+        // size, and it's all heap allocated. If this fails we made a
+        // mistake
+        writer.writer().writeIntBig(u16, self.source_port) catch unreachable;
+        writer.writer().writeIntBig(u16, self.dest_port) catch unreachable;
+        writer.writer().writeIntBig(u32, self.seq) catch unreachable;
+        writer.writer().writeIntBig(u32, self.ack_number) catch unreachable;
+        writer.writeBits(self.data_offset, 4) catch unreachable;
+        writer.writeBits(self.reserved, 4) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.cwr), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.ece), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.urg), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.ack), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.psh), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.rst), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.syn), 1) catch unreachable;
+        writer.writeBits(@boolToInt(self.flags.fin), 1) catch unreachable;
+        writer.writer().writeIntBig(u16, self.win_size) catch unreachable;
+        writer.writer().writeIntBig(u16, self.check) catch unreachable;
+        writer.writer().writeIntBig(u16, self.urgent_ptr) catch unreachable;
+        // TODO Options
+        return bounded;
     }
 
     /// Size of the header in bytes
