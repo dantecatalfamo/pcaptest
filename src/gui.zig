@@ -10,7 +10,7 @@ const c = @cImport({
 
 pub fn runGui(gui_state: *const root.GuiState) void {
     const win_height = 200;
-    const win_width  = 200;
+    const win_width  = 400;
 
     c.SetConfigFlags(c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(win_width, win_height, "PcapTest");
@@ -48,6 +48,11 @@ pub fn runGui(gui_state: *const root.GuiState) void {
         };
         const scale = @intToFloat(f64, tallest_line) / @intToFloat(f64, screen_height);
 
+        var x_line = @intCast(c_int, screen_width);
+        while (x_line > 0) : (x_line -= 60) {
+            c.DrawLine(x_line, 0, x_line, @intCast(c_int, screen_height), c.LIGHTGRAY);
+        }
+
         for (packet_slice, 0..) |item, idx| {
             if (@intCast(isize, packet_slice.len)-@intCast(isize, idx) > c.GetScreenWidth())
                 continue;
@@ -73,10 +78,10 @@ pub fn runGui(gui_state: *const root.GuiState) void {
             );
         }
 
-        c.DrawText(c.TextFormat("Device: %s", dev_name), 10, 10, 20, c.LIGHTGRAY);
-        c.DrawText(c.TextFormat("Largest: %d", tallest_line), 10, 30, 20, c.LIGHTGRAY);
+        c.DrawText(c.TextFormat("Device: %s", dev_name), 10, 10, 20, c.GRAY);
+        c.DrawText(c.TextFormat("Largest: %d", tallest_line), 10, 30, 20, c.GRAY);
         const showing_type = if (c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT)) "Packets".ptr else "Bytes".ptr;
-        c.DrawText(c.TextFormat("Showing: %s", showing_type), 10, 50, 20, c.LIGHTGRAY);
+        c.DrawText(c.TextFormat("Showing: %s", showing_type), 10, 50, 20, c.GRAY);
 
         c.EndDrawing();
     }
