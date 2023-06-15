@@ -14,7 +14,7 @@ pub const std_options = struct {
     pub const log_level = .info;
 };
 
-const graph_buffer_len = 10_000;
+pub const graph_buffer_len = 10_000;
 
 pub const GuiState = struct {
     device: ?*c.pcap_if_t = null,
@@ -39,8 +39,7 @@ pub fn main() !void {
     };
 
     log.info("Spawning GUI thread", .{} );
-    const gui_thread = try std.Thread.spawn(.{}, gui.runGui, .{ &gui_state });
-    _ = gui_thread;
+    _ = try std.Thread.spawn(.{}, gui.runGui, .{ &gui_state });
 
     var pcap_err_buf: [c.PCAP_ERRBUF_SIZE]u8 = undefined;
     const init_ret = c.pcap_init(c.PCAP_CHAR_ENC_UTF_8, &pcap_err_buf);
