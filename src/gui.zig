@@ -6,11 +6,14 @@ const testing = std.testing;
 const root = @import("root");
 const c = @cImport({
     @cInclude("raylib.h");
+    @cInclude("raygui.h");
 });
 
 pub fn runGui(gui_state: *const root.GuiState) void {
     const win_height = 200;
     const win_width  = 400;
+
+    var packet_view = false;
 
     c.SetConfigFlags(c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(win_width, win_height, "PcapTest");
@@ -28,7 +31,7 @@ pub fn runGui(gui_state: *const root.GuiState) void {
         c.BeginDrawing();
         c.ClearBackground(c.RAYWHITE);
 
-        const packet_slice = if (c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT))
+        const packet_slice = if (packet_view)
             gui_state.graph_packets.slice()
         else
             gui_state.graph_bytes.slice();
@@ -84,9 +87,10 @@ pub fn runGui(gui_state: *const root.GuiState) void {
 
         c.DrawText(c.TextFormat("Device: %s", dev_name), 10, 10, 20, c.GRAY);
         c.DrawText(c.TextFormat("Largest: %d", tallest_line), 10, 30, 20, c.GRAY);
-        const showing_type = if (c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT)) "Packets".ptr else "Bytes".ptr;
+        const showing_type = if (packet_view) "Packets".ptr else "Bytes".ptr;
         c.DrawText(c.TextFormat("Showing: %s", showing_type), 10, 50, 20, c.GRAY);
         c.DrawText(c.TextFormat("FPS: %d", c.GetFPS()), 10, 70, 20, c.GRAY);
+        _ = c.GuiCheckBox(c.Rectangle{ .x = 10, .y = 90, .width = 20, .height = 20 }, "Packet view", &packet_view);
 
         c.EndDrawing();
     }
