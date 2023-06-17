@@ -53,12 +53,18 @@ pub fn runGui(gui_state: *const root.GuiState) void {
 
         var x_line = @intCast(c_int, screen_width);
         while (x_line > 0) : (x_line -= 60) {
+            if (x_line == screen_width)
+                continue;
             var y_line = @intCast(c_int, 3);
             while (y_line < screen_height) : (y_line += 10) {
                 c.DrawLine(x_line, y_line, x_line, y_line + 5, c.LIGHTGRAY);
             }
         }
 
+        var y_dotted_line = @intCast(c_int, 3);
+        while (y_dotted_line < screen_width) : (y_dotted_line += 10) {
+            c.DrawLine(y_dotted_line, @divTrunc(@intCast(c_int, screen_height), 2), y_dotted_line + 5, @divTrunc( @intCast(c_int, screen_height), 2), c.LIGHTGRAY);
+        }
 
         for (packet_slice, 0..) |item, idx| {
             if (@intCast(isize, packet_slice.len)-@intCast(isize, idx) > c.GetScreenWidth())
@@ -85,12 +91,12 @@ pub fn runGui(gui_state: *const root.GuiState) void {
             );
         }
 
-        c.DrawText(c.TextFormat("Device: %s", dev_name), 10, 10, 20, c.GRAY);
-        c.DrawText(c.TextFormat("Largest: %d", tallest_line), 10, 30, 20, c.GRAY);
         const showing_type = if (packet_view) "Packets".ptr else "Bytes".ptr;
-        c.DrawText(c.TextFormat("Showing: %s", showing_type), 10, 50, 20, c.GRAY);
-        c.DrawText(c.TextFormat("FPS: %d", c.GetFPS()), 10, 70, 20, c.GRAY);
-        _ = c.GuiCheckBox(c.Rectangle{ .x = 10, .y = 90, .width = 20, .height = 20 }, "Packet view", &packet_view);
+        const dev_name_width = c.MeasureText(dev_name, 10);
+        c.DrawText(dev_name, @divTrunc(@intCast(c_int, screen_width), 2) - @divTrunc(dev_name_width, 2), 5, 10, c.GRAY);
+        c.DrawText(c.TextFormat("%d %s", tallest_line, showing_type), 5, 5, 10, c.GRAY);
+        c.DrawText(c.TextFormat("%d", tallest_line / 2), 5, @divTrunc(@intCast(c_int, screen_height), 2) + 5, 10, c.GRAY);
+        _ = c.GuiCheckBox(c.Rectangle{ .x = @intToFloat(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &packet_view);
 
         c.EndDrawing();
     }
