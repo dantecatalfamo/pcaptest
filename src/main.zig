@@ -20,6 +20,7 @@ pub const GuiState = struct {
     device: ?*c.pcap_if_t = null,
     graph_packets: std.BoundedArray(GraphData, graph_buffer_len),
     graph_bytes: std.BoundedArray(GraphData, graph_buffer_len),
+    packet_view: bool = false,
 };
 
 pub const GraphData = struct {

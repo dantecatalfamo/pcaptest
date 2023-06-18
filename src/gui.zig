@@ -9,11 +9,9 @@ const c = @cImport({
     @cInclude("raygui.h");
 });
 
-pub fn runGui(gui_state: *const root.GuiState) void {
+pub fn runGui(gui_state: *root.GuiState) void {
     const win_height = 200;
     const win_width  = 400;
-
-    var packet_view = false;
 
     c.SetConfigFlags(c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(win_width, win_height, "PcapTest");
@@ -31,7 +29,7 @@ pub fn runGui(gui_state: *const root.GuiState) void {
         c.BeginDrawing();
         c.ClearBackground(c.RAYWHITE);
 
-        const packet_slice = if (packet_view)
+        const packet_slice = if (gui_state.packet_view)
             gui_state.graph_packets.slice()
         else
             gui_state.graph_bytes.slice();
@@ -91,12 +89,12 @@ pub fn runGui(gui_state: *const root.GuiState) void {
             );
         }
 
-        const showing_type = if (packet_view) "Packets".ptr else "Bytes".ptr;
+        const showing_type = if (gui_state.packet_view) "Packets".ptr else "Bytes".ptr;
         const dev_name_width = c.MeasureText(dev_name, 10);
         c.DrawText(dev_name, @divTrunc(@intCast(c_int, screen_width), 2) - @divTrunc(dev_name_width, 2), 5, 10, c.GRAY);
         c.DrawText(c.TextFormat("%d %s", tallest_line, showing_type), 5, 5, 10, c.GRAY);
         c.DrawText(c.TextFormat("%d", tallest_line / 2), 5, @divTrunc(@intCast(c_int, screen_height), 2) + 5, 10, c.GRAY);
-        _ = c.GuiCheckBox(c.Rectangle{ .x = @intToFloat(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &packet_view);
+        _ = c.GuiCheckBox(c.Rectangle{ .x = @intToFloat(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
 
         c.EndDrawing();
     }
