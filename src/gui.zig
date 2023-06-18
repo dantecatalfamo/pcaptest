@@ -89,6 +89,11 @@ pub fn runGui(gui_state: *root.GuiState) void {
             );
         }
 
+        if (c.IsCursorOnScreen()) {
+            const mouse_x = c.GetMouseX();
+            c.DrawLine(mouse_x, 0, mouse_x, @intCast(c_int, screen_height), SkyTransparent);
+        }
+
         const showing_type = if (gui_state.packet_view) "Packets".ptr else "Bytes".ptr;
         const dev_name_width = c.MeasureText(dev_name, 10);
         c.DrawText(dev_name, @divTrunc(@intCast(c_int, screen_width), 2) - @divTrunc(dev_name_width, 2), 5, 10, c.GRAY);
@@ -101,3 +106,5 @@ pub fn runGui(gui_state: *root.GuiState) void {
 
     std.process.exit(0);
 }
+
+const SkyTransparent = c.Color{ .r = 102, .g = 191, .b = 255, .a = 150 };
