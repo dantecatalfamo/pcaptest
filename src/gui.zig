@@ -91,7 +91,33 @@ pub fn runGui(gui_state: *root.GuiState) void {
 
         if (c.IsCursorOnScreen()) {
             const mouse_x = c.GetMouseX();
+
+            const from_edge = @intCast(c_int, screen_width) - mouse_x;
+            const slice_item = if (from_edge <= packet_slice.len)
+                packet_slice[packet_slice.len-@intCast(usize, from_edge)]
+            else
+                root.GraphData{ .time = 0 };
+
+
+            var longest_toolip_text: c_int = 0;
+            inline for (.{
+                .{ "Total: %d", slice_item.total() },
+                .{ "TCP: %d", slice_item.tcp },
+                .{ "UDP: %d", slice_item.udp },
+            }) |pair| {
+                const len = c.MeasureText(c.TextFormat(pair.@"0", pair.@"1"), 10);
+                if (len > longest_toolip_text)
+                    longest_toolip_text = len;
+            }
+
+            var rect = c.Rectangle{ .x = 0, .y = 0, .width = @intToFloat(f32, longest_toolip_text) + 6, .height = 35 };
+            tooltipTransform(&rect);
+
             c.DrawLine(mouse_x, 0, mouse_x, @intCast(c_int, screen_height), SkyTransparent);
+            _ = c.GuiPanel(rect, null);
+            c.DrawText(c.TextFormat("Total: %d", slice_item.total()), @floatToInt(c_int, rect.x + 3), @floatToInt(c_int, rect.y + 3), 10, c.GRAY);
+            c.DrawText(c.TextFormat("TCP: %d", slice_item.tcp), @floatToInt(c_int, rect.x + 3), @floatToInt(c_int, rect.y + 13), 10, c.GRAY);
+            c.DrawText(c.TextFormat("UDP: %d", slice_item.udp), @floatToInt(c_int, rect.x + 3), @floatToInt(c_int, rect.y + 23), 10, c.GRAY);
         }
 
         const showing_type = if (gui_state.packet_view) "Packets".ptr else "Bytes".ptr;
@@ -100,10 +126,6 @@ pub fn runGui(gui_state: *root.GuiState) void {
         c.DrawText(c.TextFormat("%d %s", tallest_line, showing_type), 5, 5, 10, c.GRAY);
         c.DrawText(c.TextFormat("%d", tallest_line / 2), 5, @divTrunc(@intCast(c_int, screen_height), 2) + 5, 10, c.GRAY);
         _ = c.GuiCheckBox(c.Rectangle{ .x = @intToFloat(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
-
-        // var rect = c.Rectangle{ .x = 0, .y = 0, .width = 50, .height = 30 };
-        // tooltipTransform(&rect);
-        // c.DrawRectangle(@floatToInt(c_int, rect.x), @floatToInt(c_int, rect.y), @floatToInt(c_int, rect.width), @floatToInt(c_int, rect.height), c.RED);
 
         c.EndDrawing();
     }
@@ -117,17 +139,16 @@ pub fn tooltipTransform(rect: *c.Rectangle) void {
     const padding_x: c_int = 5;
     const padding_y: c_int = 0;
 
-    const screen_width = c.GetScreenWidth();
     const screen_height = c.GetScreenHeight();
     const mouse_x = c.GetMouseX();
     const mouse_y = c.GetMouseY();
     const rect_height = @floatToInt(c_int, rect.height);
     const rect_width = @floatToInt(c_int, rect.width);
 
-    if (screen_width - mouse_x > rect_width + padding_x) {
-        rect.x = @intToFloat(f32, mouse_x + padding_x);
-    } else {
+    if (mouse_x > rect_width + padding_x) {
         rect.x = @intToFloat(f32, mouse_x - rect_width - padding_x);
+    } else {
+        rect.x = @intToFloat(f32, mouse_x + padding_x);
     }
     if (screen_height - mouse_y > rect_height + padding_y) {
         rect.y = @intToFloat(f32, mouse_y + padding_y);
