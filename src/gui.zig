@@ -101,6 +101,10 @@ pub fn runGui(gui_state: *root.GuiState) void {
         c.DrawText(c.TextFormat("%d", tallest_line / 2), 5, @divTrunc(@intCast(c_int, screen_height), 2) + 5, 10, c.GRAY);
         _ = c.GuiCheckBox(c.Rectangle{ .x = @intToFloat(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
 
+        // var rect = c.Rectangle{ .x = 0, .y = 0, .width = 50, .height = 30 };
+        // tooltipTransform(&rect);
+        // c.DrawRectangle(@floatToInt(c_int, rect.x), @floatToInt(c_int, rect.y), @floatToInt(c_int, rect.width), @floatToInt(c_int, rect.height), c.RED);
+
         c.EndDrawing();
     }
 
@@ -108,3 +112,26 @@ pub fn runGui(gui_state: *root.GuiState) void {
 }
 
 const SkyTransparent = c.Color{ .r = 102, .g = 191, .b = 255, .a = 150 };
+
+pub fn tooltipTransform(rect: *c.Rectangle) void {
+    const padding_x: c_int = 5;
+    const padding_y: c_int = 0;
+
+    const screen_width = c.GetScreenWidth();
+    const screen_height = c.GetScreenHeight();
+    const mouse_x = c.GetMouseX();
+    const mouse_y = c.GetMouseY();
+    const rect_height = @floatToInt(c_int, rect.height);
+    const rect_width = @floatToInt(c_int, rect.width);
+
+    if (screen_width - mouse_x > rect_width + padding_x) {
+        rect.x = @intToFloat(f32, mouse_x + padding_x);
+    } else {
+        rect.x = @intToFloat(f32, mouse_x - rect_width - padding_x);
+    }
+    if (screen_height - mouse_y > rect_height + padding_y) {
+        rect.y = @intToFloat(f32, mouse_y + padding_y);
+    } else {
+        rect.y = @intToFloat(f32, mouse_y - rect_height - padding_y);
+    }
+}
