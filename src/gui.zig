@@ -130,7 +130,7 @@ pub fn runGui(gui_state: *root.GuiState) void {
         c.EndDrawing();
     }
 
-    std.process.exit(0);
+    gui_state.gui_closed = true;
 }
 
 const SkyTransparent = c.Color{ .r = 102, .g = 191, .b = 255, .a = 150 };

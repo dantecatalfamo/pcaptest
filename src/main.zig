@@ -11,16 +11,18 @@ const c = @cImport({
 });
 
 pub const std_options = struct {
-    pub const log_level = .info;
+    // pub const log_level = .info;
 };
 
 pub const graph_buffer_len = 10_000;
 
 pub const GuiState = struct {
+    pcap: ?*c.pcap_t = null,
     device: ?*c.pcap_if_t = null,
     graph_packets: std.BoundedArray(GraphData, graph_buffer_len),
     graph_bytes: std.BoundedArray(GraphData, graph_buffer_len),
     packet_view: bool = false,
+    gui_closed: bool = false,
 };
 
 pub const GraphData = struct {
@@ -65,6 +67,7 @@ pub fn main() !void {
         return;
     };
     defer c.pcap_close(dev);
+    gui_state.pcap = dev;
 
     var bpf: c.bpf_program = undefined;
     _ = bpf;
@@ -98,10 +101,15 @@ pub fn main() !void {
 
 pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c]const u8) void {
     var gui_state = @ptrCast(*GuiState, @alignCast(@alignOf(GuiState), user));
-    log.debug("Header:", .{});
-    log.debug("  Time: {d} {d}", .{ header.*.ts.tv_sec, header.*.ts.tv_usec });
-    log.debug("  Len:    {d}", .{ header.*.len });
-    log.debug("  Caplen: {d}", .{ header.*.caplen });
+    if (gui_state.gui_closed) {
+        log.debug("Calling pcap_breakloop", .{});
+        c.pcap_breakloop(gui_state.pcap);
+        return;
+    }
+    // log.debug("Header:", .{});
+    // log.debug("  Time: {d} {d}", .{ header.*.ts.tv_sec, header.*.ts.tv_usec });
+    // log.debug("  Len:    {d}", .{ header.*.len });
+    // log.debug("  Caplen: {d}", .{ header.*.caplen });
     const data = bytes[0..header.*.caplen];
     const eth = ether.Header.parse(data) catch {
         std.debug.panic("Ethernet packet too short\nBytes: {s}\n", .{ std.fmt.fmtSliceHexLower(data) });
@@ -139,9 +147,9 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
             const tcp_hdr = tcp.Header.parse(data[ether.header_size..][ip.byteSize()..]) catch unreachable;
             const tcp_bytes = tcp_hdr.toBytes();
             // Make sure we decode and encode TCP header correctly (before TODO options)
-            log.debug("Size: {d} ({d})", .{ tcp_hdr.byteSize(), tcp_hdr.data_offset });
-            log.debug("IN:  {s}", .{ std.fmt.fmtSliceHexLower(data[ether.header_size..][ip.byteSize()..][0..tcp_hdr.byteSize()]) });
-            log.debug("OUT: {s}", .{ std.fmt.fmtSliceHexLower(tcp_bytes.slice()) });
+            // log.debug("Size: {d} ({d})", .{ tcp_hdr.byteSize(), tcp_hdr.data_offset });
+            // log.debug("IN:  {s}", .{ std.fmt.fmtSliceHexLower(data[ether.header_size..][ip.byteSize()..][0..tcp_hdr.byteSize()]) });
+            // log.debug("OUT: {s}", .{ std.fmt.fmtSliceHexLower(tcp_bytes.slice()) });
             std.debug.assert(mem.eql(u8, data[ether.header_size..][ip.byteSize()..][0..tcp.header_size_min], tcp_bytes.slice()));
             log.info("{} | {} | {}", .{ eth, ip, tcp_hdr });
             current_packet_graph.tcp += 1;
