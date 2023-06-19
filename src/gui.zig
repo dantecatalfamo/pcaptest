@@ -92,7 +92,7 @@ pub fn runGui(gui_state: *root.GuiState) void {
         if (c.IsCursorOnScreen()) {
             const mouse_x = c.GetMouseX();
 
-            const from_edge = @intCast(c_int, screen_width) - mouse_x;
+            const from_edge = @intCast(c_int, screen_width) - mouse_x + 1;
             const slice_item = if (from_edge <= packet_slice.len)
                 packet_slice[packet_slice.len-@intCast(usize, from_edge)]
             else
