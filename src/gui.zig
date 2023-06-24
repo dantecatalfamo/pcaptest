@@ -45,18 +45,18 @@ pub fn runGui(gui_state: *GuiState) void {
         c.BeginDrawing();
         c.ClearBackground(c.RAYWHITE);
 
-        const packet_slice = if (gui_state.packet_view)
+        const graph_slice = if (gui_state.packet_view)
             gui_state.graph_packets.slice()
         else
             gui_state.graph_bytes.slice();
 
         const screen_width = c.GetScreenWidth();
         const screen_height = c.GetScreenHeight();
-        const x_over = @intCast(u64, @max(0, @intCast(i64, packet_slice.len) - @intCast(i64, screen_width)));
+        const x_over = @intCast(u64, @max(0, @intCast(i64, graph_slice.len) - @intCast(i64, screen_width)));
 
         const tallest_line = blk: {
             var largest: u64 = 0;
-            for (packet_slice[x_over..]) |item| {
+            for (graph_slice[x_over..]) |item| {
                 if (item.total() > largest) {
                     largest = item.total();
                 }
@@ -80,13 +80,13 @@ pub fn runGui(gui_state: *GuiState) void {
             c.DrawLine(y_dotted_line, @divTrunc(screen_height, 2), y_dotted_line + 5, @divTrunc(screen_height, 2), c.LIGHTGRAY);
         }
 
-        for (packet_slice, 0..) |item, idx| {
-            if (@intCast(isize, packet_slice.len) - @intCast(isize, idx) > c.GetScreenWidth())
+        for (graph_slice, 0..) |item, idx| {
+            if (@intCast(isize, graph_slice.len) - @intCast(isize, idx) > c.GetScreenWidth())
                 continue;
             const tcp_scaled = @intFromFloat(c_int, @floatFromInt(f64, item.tcp) / scale);
             const udp_scaled = @intFromFloat(c_int, @floatFromInt(f64, item.udp) / scale);
 
-            const x_pos = @intCast(u64, screen_width) - @min(@intCast(u64, screen_width), packet_slice.len) + (idx - x_over);
+            const x_pos = @intCast(u64, screen_width) - @min(@intCast(u64, screen_width), graph_slice.len) + (idx - x_over);
             const tcp_y_pos = screen_height - @min(tcp_scaled, screen_height);
             const udp_y_pos = screen_height - @min(udp_scaled + tcp_scaled, screen_height);
             c.DrawRectangle(@intCast(c_int, x_pos), @intCast(c_int, tcp_y_pos), 1, @intCast(c_int, tcp_scaled), c.LIME);
@@ -97,8 +97,8 @@ pub fn runGui(gui_state: *GuiState) void {
             const mouse_x = c.GetMouseX();
 
             const from_edge = screen_width - mouse_x + 1;
-            const slice_item = if (from_edge <= packet_slice.len)
-                packet_slice[packet_slice.len - @intCast(usize, from_edge)]
+            const slice_item = if (from_edge <= graph_slice.len)
+                graph_slice[graph_slice.len - @intCast(usize, from_edge)]
             else
                 GraphData{ .time = 0 };
 
@@ -183,23 +183,25 @@ pub fn AverageIterator(comptime Type: type) type {
 
             defer self.index += 1;
 
-            const begin = if (self.window_size + 1 > self.index)
+            const begin = if (self.window_size > self.index)
                 0
             else
-                self.index - self.window_size - 1;
+                self.index - self.window_size;
 
-            const end = if (self.window_size > self.array.len - self.index)
+            const end = if (self.window_size > self.array.len - 1 - self.index)
                 self.array.len
             else
-                self.index + self.window_size;
+                self.index + 1 + self.window_size;
 
             const slice = self.array[begin..end];
+
             var sum: Type = 0;
             for (slice) |item| {
                 sum += item;
             }
 
             const avg = @divTrunc(sum, slice.len);
+
             return avg;
         }
     };
@@ -208,13 +210,21 @@ pub fn AverageIterator(comptime Type: type) type {
 test "AverageIterator" {
     const array = [_]u64{ 10, 30, 40, 50, 90, 200, 900 };
     var iter = AverageIterator(u64).init(&array, 1);
-    try testing.expectEqual(@as(u64, 10), iter.next().?);
     try testing.expectEqual(@as(u64, 20), iter.next().?);
     try testing.expectEqual(@as(u64, 26), iter.next().?);
     try testing.expectEqual(@as(u64, 40), iter.next().?);
     try testing.expectEqual(@as(u64, 60), iter.next().?);
     try testing.expectEqual(@as(u64, 113), iter.next().?);
     try testing.expectEqual(@as(u64, 396), iter.next().?);
+    try testing.expectEqual(@as(u64, 550), iter.next().?);
     try testing.expect(iter.next() == null);
+    try testing.expect(iter.next() == null);
+
+    const array2 = [_]u64{ 1, 5, 20, 100 };
+    var iter2 = AverageIterator(u64).init(&array2, 0);
+    try testing.expectEqual(@as(u64, 1), iter2.next().?);
+    try testing.expectEqual(@as(u64, 5), iter2.next().?);
+    try testing.expectEqual(@as(u64, 20), iter2.next().?);
+    try testing.expectEqual(@as(u64, 100), iter2.next().?);
     try testing.expect(iter.next() == null);
 }
