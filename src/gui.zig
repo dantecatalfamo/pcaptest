@@ -14,10 +14,11 @@ pub const GuiState = struct {
     graph_bytes: std.BoundedArray(GraphData, graph_buffer_len),
     packet_view: bool = false,
     gui_closed: bool = false,
+    smoothing: c_int = 0,
 };
 
 pub const GraphData = struct {
-    time: u64,
+    time: u64 = 0,
     tcp: u64 = 0,
     udp: u64 = 0,
 
@@ -45,18 +46,26 @@ pub fn runGui(gui_state: *GuiState) void {
         c.BeginDrawing();
         c.ClearBackground(c.RAYWHITE);
 
-        const graph_slice = if (gui_state.packet_view)
+        const raw_graph_slice = if (gui_state.packet_view)
             gui_state.graph_packets.slice()
         else
             gui_state.graph_bytes.slice();
 
+        const avg_graph_slice = blk: {
+            var averaged_data: [graph_buffer_len]GraphData = undefined;
+            averageGraphData(raw_graph_slice, averaged_data[0..raw_graph_slice.len], @intCast(usize, gui_state.smoothing));
+            break :blk averaged_data;
+        };
+
+        const graph_slice = avg_graph_slice[0..raw_graph_slice.len];
+
         const screen_width = c.GetScreenWidth();
         const screen_height = c.GetScreenHeight();
-        const x_over = @intCast(u64, @max(0, @intCast(i64, graph_slice.len) - @intCast(i64, screen_width)));
+        const slice_screen_start = @intCast(u64, @max(0, @intCast(i64, graph_slice.len) - @intCast(i64, screen_width)));
 
         const tallest_line = blk: {
             var largest: u64 = 0;
-            for (graph_slice[x_over..]) |item| {
+            for (graph_slice[slice_screen_start..]) |item| {
                 if (item.total() > largest) {
                     largest = item.total();
                 }
@@ -86,7 +95,7 @@ pub fn runGui(gui_state: *GuiState) void {
             const tcp_scaled = @intFromFloat(c_int, @floatFromInt(f64, item.tcp) / scale);
             const udp_scaled = @intFromFloat(c_int, @floatFromInt(f64, item.udp) / scale);
 
-            const x_pos = @intCast(u64, screen_width) - @min(@intCast(u64, screen_width), graph_slice.len) + (idx - x_over);
+            const x_pos = @intCast(u64, screen_width) - @min(@intCast(u64, screen_width), graph_slice.len) + (idx - slice_screen_start);
             const tcp_y_pos = screen_height - @min(tcp_scaled, screen_height);
             const udp_y_pos = screen_height - @min(udp_scaled + tcp_scaled, screen_height);
             c.DrawRectangle(@intCast(c_int, x_pos), @intCast(c_int, tcp_y_pos), 1, @intCast(c_int, tcp_scaled), c.LIME);
@@ -129,6 +138,8 @@ pub fn runGui(gui_state: *GuiState) void {
         c.DrawText(c.TextFormat("%d %s", tallest_line, showing_type), 5, 5, 10, c.GRAY);
         c.DrawText(c.TextFormat("%d", tallest_line / 2), 5, @divTrunc(screen_height, 2) + 5, 10, c.GRAY);
         _ = c.GuiCheckBox(c.Rectangle{ .x = @floatFromInt(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
+        c.DrawText(c.TextFormat("FPS: %d", c.GetFPS()), 200, 5, 10, c.GRAY);
+        _ = c.GuiSpinner(c.Rectangle{ .x = @divTrunc(@floatFromInt(f32, screen_width), 2) - 20, .y = 20, .width = 100, .height = 16 }, "Smoothing ", &gui_state.smoothing, 0, 10, false);
 
         c.EndDrawing();
     }
@@ -160,19 +171,73 @@ pub fn tooltipTransform(rect: *c.Rectangle) void {
     }
 }
 
+pub fn averageGraphData(raw_graph_data: []const GraphData, averaged_data: []GraphData, window_radius: usize) void {
+    debug.assert(raw_graph_data.len == averaged_data.len);
+    var iter = GraphDataAverageIterator.init(raw_graph_data, window_radius);
+    for (0..averaged_data.len) |idx| {
+        averaged_data[idx] = iter.next().?;
+    }
+}
+
+pub const GraphDataAverageIterator = struct {
+    slice: []const GraphData,
+    index: usize,
+    window_radius: usize,
+
+    pub fn init(slice: []const GraphData, window_radius: usize) GraphDataAverageIterator {
+        return GraphDataAverageIterator{
+            .slice = slice,
+            .index = 0,
+            .window_radius = window_radius,
+        };
+    }
+
+    pub fn next(self: *GraphDataAverageIterator) ?GraphData {
+        if (self.index == self.slice.len) {
+            return null;
+        }
+
+        defer self.index += 1;
+
+        const begin = if (self.window_radius > self.index)
+            0
+        else
+            self.index - self.window_radius;
+
+        const end = if (self.window_radius > self.slice.len - 1 - self.index)
+            self.slice.len
+        else
+            self.index + 1 + self.window_radius;
+
+        const slice = self.slice[begin..end];
+
+        var sum: GraphData = GraphData{};
+        for (slice) |item| {
+            sum.tcp += item.tcp;
+            sum.udp += item.udp;
+        }
+
+        return GraphData{
+            .udp = @divTrunc(sum.udp, slice.len),
+            .tcp = @divTrunc(sum.tcp, slice.len),
+            .time = self.slice[self.index].time,
+        };
+    }
+};
+
 pub fn AverageIterator(comptime Type: type) type {
     return struct {
         array: []const Type,
         index: usize,
-        window_size: usize,
+        window_radius: usize,
 
         const Self = @This();
 
-        pub fn init(array: []const Type, window_size: usize) Self {
+        pub fn init(array: []const Type, window_radius: usize) Self {
             return Self{
                 .array = array,
                 .index = 0,
-                .window_size = window_size,
+                .window_radius = window_radius,
             };
         }
 
@@ -183,15 +248,15 @@ pub fn AverageIterator(comptime Type: type) type {
 
             defer self.index += 1;
 
-            const begin = if (self.window_size > self.index)
+            const begin = if (self.window_radius > self.index)
                 0
             else
-                self.index - self.window_size;
+                self.index - self.window_radius;
 
-            const end = if (self.window_size > self.array.len - 1 - self.index)
+            const end = if (self.window_radius > self.array.len - 1 - self.index)
                 self.array.len
             else
-                self.index + 1 + self.window_size;
+                self.index + 1 + self.window_radius;
 
             const slice = self.array[begin..end];
 
