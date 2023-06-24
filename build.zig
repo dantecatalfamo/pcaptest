@@ -24,17 +24,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe.linkLibC();
-    exe.linkSystemLibrary("pcap");
-    exe.linkSystemLibrary("raylib");
-    exe.linkSystemLibrary("pthread");
-    exe.linkSystemLibrary("GL");
-    exe.linkSystemLibrary("rt");
-    exe.linkSystemLibrary("dl");
-    exe.linkSystemLibrary("m");
-    exe.linkSystemLibrary("X11");
-    exe.addIncludePath("../../raysan5/raylib/zig-out/include");
-    exe.addLibraryPath("../../raysan5/raylib/zig-out/lib");
+    addRaylib(exe);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -72,6 +62,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    addRaylib(unit_tests);
+
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
@@ -79,4 +71,18 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
+}
+
+pub fn addRaylib(exe: *std.Build.Step.Compile) void {
+    exe.linkLibC();
+    exe.linkSystemLibrary("pcap");
+    exe.linkSystemLibrary("raylib");
+    exe.linkSystemLibrary("pthread");
+    exe.linkSystemLibrary("GL");
+    exe.linkSystemLibrary("rt");
+    exe.linkSystemLibrary("dl");
+    exe.linkSystemLibrary("m");
+    exe.linkSystemLibrary("X11");
+    exe.addIncludePath("../../raysan5/raylib/zig-out/include");
+    exe.addLibraryPath("../../raysan5/raylib/zig-out/lib");
 }

@@ -1,5 +1,4 @@
 const std = @import("std");
-const root = @import("root");
 const mem = std.mem;
 const debug = std.debug;
 const testing = std.testing;
@@ -9,9 +8,7 @@ pub const header_size_max = 60;
 
 pub fn fmtAddress(bytes: []const u8) std.BoundedArray(u8, 15) {
     var buf = std.BoundedArray(u8, 15).init(0) catch unreachable;
-    buf.writer().print("{d}.{d}.{d}.{d}", .{
-        bytes[0], bytes[1], bytes[2], bytes[3]
-    }) catch unreachable;
+    buf.writer().print("{d}.{d}.{d}.{d}", .{ bytes[0], bytes[1], bytes[2], bytes[3] }) catch unreachable;
     return buf;
 }
 
@@ -57,7 +54,7 @@ pub const Header = struct {
         const flags = @bitCast(Flags, try reader.readBitsNoEof(u3, 3));
         const frag_offset = try reader.readBitsNoEof(u13, 13);
         const ttl = try reader.reader().readByte();
-        const proto = @intToEnum(Protocol, try reader.reader().readByte());
+        const proto = @enumFromInt(Protocol, try reader.reader().readByte());
         const check = try reader.reader().readIntBig(u16);
         const source = try reader.reader().readBytesNoEof(4);
         const dest = try reader.reader().readBytesNoEof(4);
@@ -96,7 +93,7 @@ pub const Header = struct {
         writer.writeBits(@bitCast(u3, self.flags), 3) catch unreachable;
         writer.writeBits(self.frag_offset, 13) catch unreachable;
         writer.writer().writeByte(self.ttl) catch unreachable;
-        writer.writer().writeByte(@enumToInt(self.proto)) catch unreachable;
+        writer.writer().writeByte(@intFromEnum(self.proto)) catch unreachable;
         writer.writer().writeIntBig(u16, self.check) catch unreachable;
         writer.writer().writeAll(&self.source) catch unreachable;
         writer.writer().writeAll(&self.dest) catch unreachable;
@@ -109,12 +106,7 @@ pub const Header = struct {
         return @as(usize, self.ihl) * 4;
     }
 
-    pub fn format(
-        self: Header,
-        comptime fmtString: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype
-    ) !void {
+    pub fn format(self: Header, comptime fmtString: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
         _ = fmtString;
         _ = options;
         try writer.print("\x1B[48;5;53mIPv4 src={s:<15} dst={s:<15} ver={d} ihl={d} dscp={d} ecn={d} len={d:<5} id={d:<5} flags=\"{s}{s}{s}\" frag_off={d:<4} ttl={d:<3} proto={s:<4} chk={x:<4}\x1B[0m", .{
@@ -135,7 +127,6 @@ pub const Header = struct {
             self.check,
         });
     }
-
 };
 
 pub const Flags = packed struct(u3) {
@@ -452,7 +443,7 @@ pub const Options = struct {
     type: Type,
     length: u8,
 
-    pub const Class = enum (u2) {
+    pub const Class = enum(u2) {
         control = 0,
         reserved_1 = 1,
         debugging = 2,

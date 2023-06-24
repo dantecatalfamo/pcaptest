@@ -105,14 +105,14 @@ pub const Header = struct {
         writer.writer().writeIntBig(u32, self.ack_number) catch unreachable;
         writer.writeBits(self.data_offset, 4) catch unreachable;
         writer.writeBits(self.reserved, 4) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.cwr), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.ece), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.urg), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.ack), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.psh), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.rst), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.syn), 1) catch unreachable;
-        writer.writeBits(@boolToInt(self.flags.fin), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.cwr), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.ece), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.urg), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.ack), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.psh), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.rst), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.syn), 1) catch unreachable;
+        writer.writeBits(@intFromBool(self.flags.fin), 1) catch unreachable;
         writer.writer().writeIntBig(u16, self.win_size) catch unreachable;
         writer.writer().writeIntBig(u16, self.check) catch unreachable;
         writer.writer().writeIntBig(u16, self.urgent_ptr) catch unreachable;
@@ -125,12 +125,7 @@ pub const Header = struct {
         return @as(usize, self.data_offset) * 4;
     }
 
-    pub fn format(
-        self: Header,
-        comptime fmtString: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype
-    ) !void {
+    pub fn format(self: Header, comptime fmtString: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
         _ = fmtString;
         _ = options;
 

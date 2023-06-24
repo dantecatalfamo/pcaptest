@@ -1,5 +1,4 @@
 const std = @import("std");
-const root = @import("root");
 const fmt = std.fmt;
 const mem = std.mem;
 
@@ -185,7 +184,7 @@ pub const Header = struct {
         var header = Header{
             .dest = undefined,
             .source = undefined,
-            .ether_type = @intToEnum(EtherType, mem.readIntBig(u16, bytes[12..14])),
+            .ether_type = @enumFromInt(EtherType, mem.readIntBig(u16, bytes[12..14])),
         };
         @memcpy(&header.dest, bytes[0..6]);
         @memcpy(&header.source, bytes[6..12]);
@@ -196,27 +195,30 @@ pub const Header = struct {
         var out: [14]u8 = undefined;
         @memcpy(out[0..6], &self.dest);
         @memcpy(out[6..12], &self.source);
-        mem.writeIntBig(u16, out[12..14], @enumToInt(self.ether_type));
+        mem.writeIntBig(u16, out[12..14], @intFromEnum(self.ether_type));
         return out;
     }
 
-    pub fn format(
-        self: Header,
-        comptime fmtString: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype
-    ) !void {
+    pub fn format(self: Header, comptime fmtString: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
         _ = fmtString;
         _ = options;
 
         try writer.print("\x1B[48;5;17mEthernet src={s} dst={s} type={s}\x1B[0m", .{
             fmtAddress(&self.source),
             fmtAddress(&self.dest),
-            if (root.isNamed(self.ether_type))
+            if (isNamed(self.ether_type))
                 @tagName(self.ether_type)
             else
                 "(unknown)",
-
         });
     }
 };
+
+pub inline fn isNamed(enum_val: anytype) bool {
+    const E = @TypeOf(enum_val);
+    inline for (@typeInfo(E).Enum.fields) |field| {
+        if (@intFromEnum(enum_val) == field.value)
+            return true;
+    }
+    return false;
+}

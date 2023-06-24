@@ -37,12 +37,7 @@ pub const Header = struct {
         return buffer;
     }
 
-    pub fn format(
-        self: Header,
-        comptime fmtString: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype
-    ) !void {
+    pub fn format(self: Header, comptime fmtString: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
         _ = fmtString;
         _ = options;
         try writer.print("\x1B[48;5;52mUDP src={d:<5} dst={d:<5} len={d:<5} chk={d:<5}\x1B[0m", .{

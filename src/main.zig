@@ -6,51 +6,28 @@ const ipv4 = @import("ipv4.zig");
 const tcp = @import("tcp.zig");
 const udp = @import("udp.zig");
 const gui = @import("gui.zig");
-const c = @cImport({
-    @cInclude("pcap/pcap.h");
-});
+const c = @import("c.zig").c;
 
 pub const std_options = struct {
-    // pub const log_level = .info;
-};
-
-pub const graph_buffer_len = 10_000;
-
-pub const GuiState = struct {
-    pcap: ?*c.pcap_t = null,
-    device: ?*c.pcap_if_t = null,
-    graph_packets: std.BoundedArray(GraphData, graph_buffer_len),
-    graph_bytes: std.BoundedArray(GraphData, graph_buffer_len),
-    packet_view: bool = false,
-    gui_closed: bool = false,
-};
-
-pub const GraphData = struct {
-    time: u64,
-    tcp: u64 = 0,
-    udp: u64 = 0,
-
-    pub inline fn total(self: GraphData) u64 {
-        return self.tcp + self.udp;
-    }
+    pub const log_level = .info;
 };
 
 pub fn main() !void {
-    var gui_state = GuiState{
-        .graph_packets = try std.BoundedArray(GraphData, graph_buffer_len).init(0),
-        .graph_bytes = try std.BoundedArray(GraphData, graph_buffer_len).init(0),
+    var gui_state = gui.GuiState{
+        .graph_packets = try std.BoundedArray(gui.GraphData, gui.graph_buffer_len).init(0),
+        .graph_bytes = try std.BoundedArray(gui.GraphData, gui.graph_buffer_len).init(0),
     };
 
-    log.info("Spawning GUI thread", .{} );
-    _ = try std.Thread.spawn(.{}, gui.runGui, .{ &gui_state });
+    log.info("Spawning GUI thread", .{});
+    _ = try std.Thread.spawn(.{}, gui.runGui, .{&gui_state});
 
     var pcap_err_buf: [c.PCAP_ERRBUF_SIZE]u8 = undefined;
     const init_ret = c.pcap_init(c.PCAP_CHAR_ENC_UTF_8, &pcap_err_buf);
-    log.debug("init_ret: {d}", .{ init_ret });
+    log.debug("init_ret: {d}", .{init_ret});
 
     var pcap_devs: ?*c.pcap_if_t = null;
     const dev_ret = c.pcap_findalldevs(&pcap_devs, &pcap_err_buf);
-    log.debug("dev_ret: {d}", .{ dev_ret });
+    log.debug("dev_ret: {d}", .{dev_ret});
     defer c.pcap_freealldevs(pcap_devs);
 
     if (pcap_devs) |dev| {
@@ -61,9 +38,9 @@ pub fn main() !void {
     }
 
     gui_state.device = pcap_devs;
-    log.info("Opening device: {s}", .{ pcap_devs.?.name });
+    log.info("Opening device: {s}", .{pcap_devs.?.name});
     const dev = c.pcap_create(pcap_devs.?.name, &pcap_err_buf) orelse {
-        log.err("No device: {s}", .{ pcap_err_buf });
+        log.err("No device: {s}", .{pcap_err_buf});
         return;
     };
     defer c.pcap_close(dev);
@@ -79,28 +56,28 @@ pub fn main() !void {
     // std.debug.print("promisc_ret: {d}\n", .{ promisc_ret });
 
     const timeout_ms = 200;
-    log.debug("Setting timeout at {d}ms", .{ timeout_ms });
+    log.debug("Setting timeout at {d}ms", .{timeout_ms});
     const timeout_ret = c.pcap_set_timeout(dev, timeout_ms);
-    log.debug("timeout_ret: {d}", .{ timeout_ret });
+    log.debug("timeout_ret: {d}", .{timeout_ret});
 
     // const snaplen_ret = c.pcap_set_snaplen(dev, 65535);
     // std.debug.print("snapshot_ret: {d}\n", .{ snaplen_ret });
 
     log.debug("Activating device", .{});
     const activate_ret = c.pcap_activate(dev);
-    log.debug("activate_ret: {d}", .{ activate_ret });
+    log.debug("activate_ret: {d}", .{activate_ret});
     if (activate_ret < 0) {
-        log.err("Error activating: {s}", .{ c.pcap_geterr(dev) });
+        log.err("Error activating: {s}", .{c.pcap_geterr(dev)});
         return;
     }
 
     log.debug("Starting pcap_loop", .{});
     const loop_ret = c.pcap_loop(dev, 0, callback, @ptrCast(*u8, &gui_state));
-    log.debug("loop_ret: {d}", .{ loop_ret });
+    log.debug("loop_ret: {d}", .{loop_ret});
 }
 
 pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c]const u8) void {
-    var gui_state = @ptrCast(*GuiState, @alignCast(@alignOf(GuiState), user));
+    var gui_state = @ptrCast(*gui.GuiState, @alignCast(@alignOf(gui.GuiState), user));
     if (gui_state.gui_closed) {
         log.debug("Calling pcap_breakloop", .{});
         c.pcap_breakloop(gui_state.pcap);
@@ -112,15 +89,14 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     // log.debug("  Caplen: {d}", .{ header.*.caplen });
     const data = bytes[0..header.*.caplen];
     const eth = ether.Header.parse(data) catch {
-        std.debug.panic("Ethernet packet too short\nBytes: {s}\n", .{ std.fmt.fmtSliceHexLower(data) });
+        std.debug.panic("Ethernet packet too short\nBytes: {s}\n", .{std.fmt.fmtSliceHexLower(data)});
     };
     // Make sure we decoded and encode the ethernet header correctly
     std.debug.assert(mem.eql(u8, data[0..ether.header_size], &eth.toBytes()));
     if (eth.ether_type != .ip) {
-        log.info("{}", .{ eth });
+        log.info("{}", .{eth});
         return;
     }
-
 
     const ip = ipv4.Header.parse(data[ether.header_size..]) catch unreachable;
     const ip_header = ip.toBytes();
@@ -130,17 +106,16 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
     const now = std.time.timestamp();
 
     // TODO Doesn't account for seconds where no packets are received
-    if (gui_state.graph_packets.len == 0 or gui_state.graph_packets.slice()[gui_state.graph_packets.len-1].time != now) {
+    if (gui_state.graph_packets.len == 0 or gui_state.graph_packets.slice()[gui_state.graph_packets.len - 1].time != now) {
         if (gui_state.graph_packets.len == gui_state.graph_packets.capacity()) {
             _ = gui_state.graph_packets.orderedRemove(0);
             _ = gui_state.graph_bytes.orderedRemove(0);
         }
-        gui_state.graph_packets.append(GraphData{ .time = @intCast(u64, now) }) catch unreachable;
-        gui_state.graph_bytes.append(GraphData{ .time = @intCast(u64, now) }) catch unreachable;
+        gui_state.graph_packets.append(gui.GraphData{ .time = @intCast(u64, now) }) catch unreachable;
+        gui_state.graph_bytes.append(gui.GraphData{ .time = @intCast(u64, now) }) catch unreachable;
     }
-    var current_packet_graph = &gui_state.graph_packets.slice()[gui_state.graph_packets.len-1];
-    var current_byte_graph = &gui_state.graph_bytes.slice()[gui_state.graph_packets.len-1];
-
+    var current_packet_graph = &gui_state.graph_packets.slice()[gui_state.graph_packets.len - 1];
+    var current_byte_graph = &gui_state.graph_bytes.slice()[gui_state.graph_packets.len - 1];
 
     switch (ip.proto) {
         .tcp => {
@@ -164,15 +139,15 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
         },
         else => {
             log.info("{} | {}", .{ eth, ip });
-        }
+        },
     }
 }
 
 pub fn debugDev(dev: *const c.pcap_if_t) void {
-    log.debug("Device: {s}", .{ dev.name });
-    log.debug("Flags: {d}", .{ dev.flags });
+    log.debug("Device: {s}", .{dev.name});
+    log.debug("Flags: {d}", .{dev.flags});
     if (dev.description) |desc| {
-        log.debug("Description: {s}", .{ desc });
+        log.debug("Description: {s}", .{desc});
     }
     if (dev.next) |next| {
         log.debug("-----", .{});
@@ -180,11 +155,6 @@ pub fn debugDev(dev: *const c.pcap_if_t) void {
     }
 }
 
-pub inline fn isNamed(enum_val: anytype) bool {
-    const E = @TypeOf(enum_val);
-    inline for (@typeInfo(E).Enum.fields) |field| {
-        if (@enumToInt(enum_val) == field.value)
-            return true;
-    }
-    return false;
+test "ref all" {
+    std.testing.refAllDeclsRecursive(@This());
 }
