@@ -113,9 +113,9 @@ pub fn runGui(gui_state: *GuiState) void {
 
             var longest_toolip_text: c_int = 0;
             inline for (.{
-                .{ "Total: %d", slice_item.total() },
-                .{ "TCP: %d", slice_item.tcp },
-                .{ "UDP: %d", slice_item.udp },
+                .{ "Total: %s", formatBytes(slice_item.total(), gui_state.packet_view) },
+                .{ "TCP: %s", formatBytes(slice_item.tcp, gui_state.packet_view) },
+                .{ "UDP: %s", formatBytes(slice_item.udp, gui_state.packet_view) },
             }) |pair| {
                 const len = c.MeasureText(c.TextFormat(pair.@"0", pair.@"1"), 10);
                 if (len > longest_toolip_text)
@@ -127,19 +127,18 @@ pub fn runGui(gui_state: *GuiState) void {
 
             c.DrawLine(mouse_x, 0, mouse_x, screen_height, SkyTransparent);
             _ = c.GuiPanel(rect, null);
-            c.DrawText(c.TextFormat("Total: %d", slice_item.total()), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 3), 10, c.GRAY);
-            c.DrawText(c.TextFormat("TCP: %d", slice_item.tcp), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 13), 10, c.GRAY);
-            c.DrawText(c.TextFormat("UDP: %d", slice_item.udp), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 23), 10, c.GRAY);
+            c.DrawText(c.TextFormat("Total: %s", formatBytes(slice_item.total(), gui_state.packet_view)), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 3), 10, c.GRAY);
+            c.DrawText(c.TextFormat("TCP: %s", formatBytes(slice_item.tcp, gui_state.packet_view)), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 13), 10, c.GRAY);
+            c.DrawText(c.TextFormat("UDP: %s", formatBytes(slice_item.udp, gui_state.packet_view)), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 23), 10, c.GRAY);
         }
 
-        const showing_type = if (gui_state.packet_view) "Packets".ptr else "Bytes".ptr;
         const dev_name_width = c.MeasureText(dev_name, 10);
         c.DrawText(dev_name, @divTrunc(screen_width, 2) - @divTrunc(dev_name_width, 2), 5, 10, c.GRAY);
-        c.DrawText(c.TextFormat("%d %s", tallest_line, showing_type), 5, 5, 10, c.GRAY);
-        c.DrawText(c.TextFormat("%d", tallest_line / 2), 5, @divTrunc(screen_height, 2) + 5, 10, c.GRAY);
+        c.DrawText(c.TextFormat("%s", formatBytes(tallest_line, gui_state.packet_view)), 5, 5, 10, c.GRAY);
+        c.DrawText(c.TextFormat("%s", formatBytes(tallest_line / 2, gui_state.packet_view)), 5, @divTrunc(screen_height, 2) + 5, 10, c.GRAY);
         _ = c.GuiCheckBox(c.Rectangle{ .x = @floatFromInt(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
         c.DrawText(c.TextFormat("FPS: %d", c.GetFPS()), 200, 5, 10, c.GRAY);
-        _ = c.GuiSpinner(c.Rectangle{ .x = @divTrunc(@floatFromInt(f32, screen_width), 2) - 20, .y = 20, .width = 100, .height = 16 }, "Smoothing ", &gui_state.smoothing, 0, 10, false);
+        _ = c.GuiSpinner(c.Rectangle{ .x = @divTrunc(@floatFromInt(f32, screen_width), 2) - 20, .y = 20, .width = 100, .height = 16 }, "Smoothing ", &gui_state.smoothing, 0, 5, false);
 
         c.EndDrawing();
     }
@@ -148,6 +147,26 @@ pub fn runGui(gui_state: *GuiState) void {
 }
 
 const SkyTransparent = c.Color{ .r = 102, .g = 191, .b = 255, .a = 150 };
+
+pub fn formatBytes(bytes: u64, packets: bool) [*:0]const u8 {
+    const float = @floatFromInt(f64, bytes);
+    const ending = if (packets) "".ptr else "B".ptr;
+    const ending_with_space = if (packets) "".ptr else " B".ptr;
+    if (bytes < 1024) {
+        return c.TextFormat("%d%s", bytes, ending_with_space);
+    } else if (bytes < 1024 * 1024) {
+        return c.TextFormat("%.2f K%s", float / 1024, ending);
+    } else if (bytes < 1024 * 1024 * 1024) {
+        return c.TextFormat("%.2f M%s", float / 1024 / 1024, ending);
+    } else {
+        return c.TextFormat("%.2f G%s", float / 1024 / 1024 / 1024, ending);
+    }
+}
+
+const ViewUnits = enum {
+    bytes,
+    packets,
+};
 
 pub fn tooltipTransform(rect: *c.Rectangle) void {
     const padding_x: c_int = 5;
