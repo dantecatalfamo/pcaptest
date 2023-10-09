@@ -184,7 +184,7 @@ pub const Header = struct {
         var header = Header{
             .dest = undefined,
             .source = undefined,
-            .ether_type = @enumFromInt(EtherType, mem.readIntBig(u16, bytes[12..14])),
+            .ether_type = @enumFromInt(mem.readIntBig(u16, bytes[12..14])),
         };
         @memcpy(&header.dest, bytes[0..6]);
         @memcpy(&header.source, bytes[6..12]);

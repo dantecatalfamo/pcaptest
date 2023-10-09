@@ -51,10 +51,10 @@ pub const Header = struct {
         const ecn = try reader.readBitsNoEof(u2, 2);
         const len = try reader.reader().readIntBig(u16);
         const id = try reader.reader().readIntBig(u16);
-        const flags = @bitCast(Flags, try reader.readBitsNoEof(u3, 3));
+        const flags: Flags = @bitCast(try reader.readBitsNoEof(u3, 3));
         const frag_offset = try reader.readBitsNoEof(u13, 13);
         const ttl = try reader.reader().readByte();
-        const proto = @enumFromInt(Protocol, try reader.reader().readByte());
+        const proto: Protocol = @enumFromInt(try reader.reader().readByte());
         const check = try reader.reader().readIntBig(u16);
         const source = try reader.reader().readBytesNoEof(4);
         const dest = try reader.reader().readBytesNoEof(4);
@@ -90,7 +90,7 @@ pub const Header = struct {
         writer.writeBits(self.ecn, 2) catch unreachable;
         writer.writer().writeIntBig(u16, self.len) catch unreachable;
         writer.writer().writeIntBig(u16, self.id) catch unreachable;
-        writer.writeBits(@bitCast(u3, self.flags), 3) catch unreachable;
+        writer.writeBits(@as(u3, @bitCast(self.flags)), 3) catch unreachable;
         writer.writeBits(self.frag_offset, 13) catch unreachable;
         writer.writer().writeByte(self.ttl) catch unreachable;
         writer.writer().writeByte(@intFromEnum(self.proto)) catch unreachable;

@@ -72,12 +72,12 @@ pub fn main() !void {
     }
 
     log.debug("Starting pcap_loop", .{});
-    const loop_ret = c.pcap_loop(dev, 0, callback, @ptrCast(*u8, &gui_state));
+    const loop_ret = c.pcap_loop(dev, 0, callback, @ptrCast(&gui_state));
     log.debug("loop_ret: {d}", .{loop_ret});
 }
 
 pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c]const u8) void {
-    var gui_state = @ptrCast(*gui.GuiState, @alignCast(@alignOf(gui.GuiState), user));
+    var gui_state: *gui.GuiState = @ptrCast(@alignCast(user));
     if (gui_state.gui_closed) {
         log.debug("Calling pcap_breakloop", .{});
         c.pcap_breakloop(gui_state.pcap);
@@ -111,8 +111,8 @@ pub export fn callback(user: [*c]u8, header: [*c]const c.pcap_pkthdr, bytes: [*c
             _ = gui_state.graph_packets.orderedRemove(0);
             _ = gui_state.graph_bytes.orderedRemove(0);
         }
-        gui_state.graph_packets.append(gui.GraphData{ .time = @intCast(u64, now) }) catch unreachable;
-        gui_state.graph_bytes.append(gui.GraphData{ .time = @intCast(u64, now) }) catch unreachable;
+        gui_state.graph_packets.append(gui.GraphData{ .time = @intCast(now) }) catch unreachable;
+        gui_state.graph_bytes.append(gui.GraphData{ .time = @intCast(now) }) catch unreachable;
     }
     var current_packet_graph = &gui_state.graph_packets.slice()[gui_state.graph_packets.len - 1];
     var current_byte_graph = &gui_state.graph_bytes.slice()[gui_state.graph_packets.len - 1];

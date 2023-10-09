@@ -83,6 +83,6 @@ pub fn addRaylib(exe: *std.Build.Step.Compile) void {
     exe.linkSystemLibrary("dl");
     exe.linkSystemLibrary("m");
     exe.linkSystemLibrary("X11");
-    exe.addIncludePath("../../raysan5/raylib/zig-out/include");
-    exe.addLibraryPath("../../raysan5/raylib/zig-out/lib");
+    exe.addIncludePath(.{ .path = "../../raysan5/raylib/zig-out/include" });
+    exe.addLibraryPath(.{ .path = "../../raysan5/raylib/zig-out/lib" });
 }

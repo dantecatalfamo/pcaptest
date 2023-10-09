@@ -39,7 +39,7 @@ pub fn runGui(gui_state: *GuiState) void {
 
     while (!c.WindowShouldClose()) {
         const dev_name = if (gui_state.device) |dev|
-            @ptrCast([*:0]u8, dev.name)
+            mem.span(dev.name)
         else
             "No device";
 
@@ -53,7 +53,7 @@ pub fn runGui(gui_state: *GuiState) void {
 
         const avg_graph_slice = blk: {
             var averaged_data: [graph_buffer_len]GraphData = undefined;
-            averageGraphData(raw_graph_slice, averaged_data[0..raw_graph_slice.len], @intCast(usize, gui_state.smoothing));
+            averageGraphData(raw_graph_slice, averaged_data[0..raw_graph_slice.len], @intCast(gui_state.smoothing));
             break :blk averaged_data;
         };
 
@@ -61,7 +61,7 @@ pub fn runGui(gui_state: *GuiState) void {
 
         const screen_width = c.GetScreenWidth();
         const screen_height = c.GetScreenHeight();
-        const slice_screen_start = @intCast(u64, @max(0, @intCast(i64, graph_slice.len) - @intCast(i64, screen_width)));
+        const slice_screen_start: u64 = @intCast(@max(0, @as(i64, @intCast(graph_slice.len)) - @as(i64, @intCast(screen_width))));
 
         const tallest_line = blk: {
             var largest: u64 = 0;
@@ -72,13 +72,13 @@ pub fn runGui(gui_state: *GuiState) void {
             }
             break :blk largest;
         };
-        const scale = @floatFromInt(f64, tallest_line) / @floatFromInt(f64, screen_height);
+        const scale = @as(f64, @floatFromInt(tallest_line)) / @as(f64, @floatFromInt(screen_height));
 
         var x_line = screen_width;
         while (x_line > 0) : (x_line -= 60) {
             if (x_line == screen_width)
                 continue;
-            var y_line = @intCast(c_int, 3);
+            var y_line: c_int = 3;
             while (y_line < screen_height) : (y_line += 10) {
                 c.DrawLine(x_line, y_line, x_line, y_line + 5, c.LIGHTGRAY);
             }
@@ -90,16 +90,16 @@ pub fn runGui(gui_state: *GuiState) void {
         }
 
         for (graph_slice, 0..) |item, idx| {
-            if (@intCast(isize, graph_slice.len) - @intCast(isize, idx) > c.GetScreenWidth())
+            if (@as(isize, @intCast(graph_slice.len)) - @as(isize, @intCast(idx)) > c.GetScreenWidth())
                 continue;
-            const tcp_scaled = @intFromFloat(c_int, @floatFromInt(f64, item.tcp) / scale);
-            const udp_scaled = @intFromFloat(c_int, @floatFromInt(f64, item.udp) / scale);
+            const tcp_scaled: c_int = @intFromFloat(@as(f64, @floatFromInt(item.tcp)) / scale);
+            const udp_scaled: c_int = @intFromFloat(@as(f64, @floatFromInt(item.udp)) / scale);
 
-            const x_pos = @intCast(u64, screen_width) - @min(@intCast(u64, screen_width), graph_slice.len) + (idx - slice_screen_start);
+            const x_pos = @as(u64, @intCast(screen_width)) - @min(@as(u64, @intCast(screen_width)), graph_slice.len) + (idx - slice_screen_start);
             const tcp_y_pos = screen_height - @min(tcp_scaled, screen_height);
             const udp_y_pos = screen_height - @min(udp_scaled + tcp_scaled, screen_height);
-            c.DrawRectangle(@intCast(c_int, x_pos), @intCast(c_int, tcp_y_pos), 1, @intCast(c_int, tcp_scaled), c.LIME);
-            c.DrawRectangle(@intCast(c_int, x_pos), @intCast(c_int, udp_y_pos), 1, @intCast(c_int, udp_scaled), c.MAROON);
+            c.DrawRectangle(@as(c_int, @intCast(x_pos)), @as(c_int, @intCast(tcp_y_pos)), 1, @as(c_int, @intCast(tcp_scaled)), c.LIME);
+            c.DrawRectangle(@as(c_int, @intCast(x_pos)), @as(c_int, @intCast(udp_y_pos)), 1, @as(c_int, @intCast(udp_scaled)), c.MAROON);
         }
 
         if (c.IsCursorOnScreen()) {
@@ -107,7 +107,7 @@ pub fn runGui(gui_state: *GuiState) void {
 
             const from_edge = screen_width - mouse_x + 1;
             const slice_item = if (from_edge <= graph_slice.len)
-                graph_slice[graph_slice.len - @intCast(usize, from_edge)]
+                graph_slice[graph_slice.len - @as(usize, @intCast(from_edge))]
             else
                 GraphData{ .time = 0 };
 
@@ -122,23 +122,23 @@ pub fn runGui(gui_state: *GuiState) void {
                     longest_toolip_text = len;
             }
 
-            var rect = c.Rectangle{ .x = 0, .y = 0, .width = @floatFromInt(f32, longest_toolip_text) + 6, .height = 35 };
+            var rect = c.Rectangle{ .x = 0, .y = 0, .width = @as(f32, @floatFromInt(longest_toolip_text)) + 6, .height = 35 };
             tooltipTransform(&rect);
 
             c.DrawLine(mouse_x, 0, mouse_x, screen_height, SkyTransparent);
             _ = c.GuiPanel(rect, null);
-            c.DrawText(c.TextFormat("Total: %s", formatBytes(slice_item.total(), gui_state.packet_view)), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 3), 10, c.GRAY);
-            c.DrawText(c.TextFormat("TCP: %s", formatBytes(slice_item.tcp, gui_state.packet_view)), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 13), 10, c.GRAY);
-            c.DrawText(c.TextFormat("UDP: %s", formatBytes(slice_item.udp, gui_state.packet_view)), @intFromFloat(c_int, rect.x + 3), @intFromFloat(c_int, rect.y + 23), 10, c.GRAY);
+            c.DrawText(c.TextFormat("Total: %s", formatBytes(slice_item.total(), gui_state.packet_view)), @as(c_int, @intFromFloat(rect.x + 3)), @as(c_int, @intFromFloat(rect.y + 3)), 10, c.GRAY);
+            c.DrawText(c.TextFormat("TCP: %s", formatBytes(slice_item.tcp, gui_state.packet_view)), @as(c_int, @intFromFloat(rect.x + 3)), @as(c_int, @intFromFloat(rect.y + 13)), 10, c.GRAY);
+            c.DrawText(c.TextFormat("UDP: %s", formatBytes(slice_item.udp, gui_state.packet_view)), @as(c_int, @intFromFloat(rect.x + 3)), @as(c_int, @intFromFloat(rect.y + 23)), 10, c.GRAY);
         }
 
         const dev_name_width = c.MeasureText(dev_name, 10);
         c.DrawText(dev_name, @divTrunc(screen_width, 2) - @divTrunc(dev_name_width, 2), 5, 10, c.GRAY);
         c.DrawText(c.TextFormat("%s", formatBytes(tallest_line, gui_state.packet_view)), 5, 5, 10, c.GRAY);
         c.DrawText(c.TextFormat("%s", formatBytes(tallest_line / 2, gui_state.packet_view)), 5, @divTrunc(screen_height, 2) + 5, 10, c.GRAY);
-        _ = c.GuiCheckBox(c.Rectangle{ .x = @floatFromInt(f32, @max(80, screen_width) - 80), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
+        _ = c.GuiCheckBox(c.Rectangle{ .x = @as(f32, @floatFromInt(@max(80, screen_width) - 80)), .y = 5, .width = 10, .height = 10 }, "Packet view", &gui_state.packet_view);
         c.DrawText(c.TextFormat("FPS: %d", c.GetFPS()), 200, 5, 10, c.GRAY);
-        _ = c.GuiSpinner(c.Rectangle{ .x = @divTrunc(@floatFromInt(f32, screen_width), 2) - 20, .y = 20, .width = 100, .height = 16 }, "Smoothing ", &gui_state.smoothing, 0, 5, false);
+        _ = c.GuiSpinner(c.Rectangle{ .x = @divTrunc(@as(f32, @floatFromInt(screen_width)), 2) - 20, .y = 20, .width = 100, .height = 16 }, "Smoothing ", &gui_state.smoothing, 0, 5, false);
 
         c.EndDrawing();
     }
@@ -149,7 +149,7 @@ pub fn runGui(gui_state: *GuiState) void {
 const SkyTransparent = c.Color{ .r = 102, .g = 191, .b = 255, .a = 150 };
 
 pub fn formatBytes(bytes: u64, packets: bool) [*:0]const u8 {
-    const float = @floatFromInt(f64, bytes);
+    const float: f64 = @floatFromInt(bytes);
     const ending = if (packets) "".ptr else "B".ptr;
     const ending_with_space = if (packets) "".ptr else " B".ptr;
     if (bytes < 1024) {
@@ -175,18 +175,18 @@ pub fn tooltipTransform(rect: *c.Rectangle) void {
     const screen_height = c.GetScreenHeight();
     const mouse_x = c.GetMouseX();
     const mouse_y = c.GetMouseY();
-    const rect_height = @intFromFloat(c_int, rect.height);
-    const rect_width = @intFromFloat(c_int, rect.width);
+    const rect_height: c_int = @intFromFloat(rect.height);
+    const rect_width: c_int = @intFromFloat(rect.width);
 
     if (mouse_x > rect_width + padding_x) {
-        rect.x = @floatFromInt(f32, mouse_x - rect_width - padding_x);
+        rect.x = @floatFromInt(mouse_x - rect_width - padding_x);
     } else {
-        rect.x = @floatFromInt(f32, mouse_x + padding_x);
+        rect.x = @floatFromInt(mouse_x + padding_x);
     }
     if (screen_height - mouse_y > rect_height + padding_y) {
-        rect.y = @floatFromInt(f32, mouse_y + padding_y);
+        rect.y = @floatFromInt(mouse_y + padding_y);
     } else {
-        rect.y = @floatFromInt(f32, mouse_y - rect_height - padding_y);
+        rect.y = @floatFromInt(mouse_y - rect_height - padding_y);
     }
 }
 
